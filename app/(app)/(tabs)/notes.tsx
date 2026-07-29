@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, RefreshControl, TouchableOpacity, TextInput as RNTextInput, ScrollView } from 'react-native';
+import { router } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
@@ -9,6 +10,7 @@ import { SearchBar } from '@ui/components/molecules/SearchBar';
 import { FloatingButton } from '@ui/components/molecules/FloatingButton';
 import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
+import { useTranslation } from 'react-i18next';
 import { Icon } from '@ui/components/atoms/Icon';
 import { useSecureStorage } from '@ui/hooks/useSecureStorage';
 
@@ -24,6 +26,7 @@ const NOTES_STORAGE_KEY = 'khaznati_notes';
 
 export default function NotesScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { getItem, setItem } = useSecureStorage();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,13 +106,13 @@ export default function NotesScreen() {
 
   if (editingNote) {
     return (
-      <ScreenLayout title={notes.find((n) => n.id === editingNote.id) ? 'Edit Note' : 'New Note'} showBack onBack={() => setEditingNote(null)}>
+      <ScreenLayout title={notes.find((n) => n.id === editingNote.id) ? t('notes.edit') : t('notes.create')} showBack onBack={() => setEditingNote(null)}>
         <View style={styles.editorContainer}>
           <RNTextInput
             style={[styles.titleInput, { color: colors.onSurface }]}
             value={editTitle}
             onChangeText={setEditTitle}
-            placeholder="Note title"
+            placeholder={t('notes.titlePlaceholder')}
             placeholderTextColor={colors.onSurfaceVariant}
             autoFocus
           />
@@ -117,17 +120,17 @@ export default function NotesScreen() {
             style={[styles.contentInput, { color: colors.onSurface }]}
             value={editContent}
             onChangeText={setEditContent}
-            placeholder="Write your note here..."
+            placeholder={t('notes.contentPlaceholder')}
             placeholderTextColor={colors.onSurfaceVariant}
             multiline
             textAlignVertical="top"
           />
           <View style={styles.editorActions}>
             <TouchableOpacity onPress={() => setEditingNote(null)} style={[styles.editorBtn, { borderColor: colors.outline }]}>
-              <Typography color={colors.onSurfaceVariant}>Cancel</Typography>
+              <Typography color={colors.onSurfaceVariant}>{t('common.cancel')}</Typography>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSaveNote} style={[styles.editorBtn, styles.saveBtn, { backgroundColor: colors.primary }]}>
-              <Typography color="#FFFFFF">Save</Typography>
+              <Typography color="#FFFFFF">{t('common.save')}</Typography>
             </TouchableOpacity>
           </View>
         </View>
@@ -136,7 +139,7 @@ export default function NotesScreen() {
   }
 
   if (loading && notes.length === 0) {
-    return <Loading fullScreen message="Loading notes..." />;
+    return <Loading fullScreen message={t('common.loading')} />;
   }
 
   if (error && notes.length === 0) {
@@ -144,8 +147,8 @@ export default function NotesScreen() {
   }
 
   return (
-    <ScreenLayout title="Notes" subtitle={`${notes.length} note${notes.length !== 1 ? 's' : ''}`}>
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Search notes..." onClear={() => setSearch('')} />
+    <ScreenLayout title={t('notes.title')} subtitle={t('vault.itemsCount', { count: notes.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
+      <SearchBar value={search} onChangeText={setSearch} placeholder={t('notes.search')} onClear={() => setSearch('')} />
       <ScrollView
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
@@ -154,9 +157,9 @@ export default function NotesScreen() {
         {filteredNotes.length === 0 ? (
           <EmptyState
             icon="note-text-outline"
-            title={search ? 'No matching notes' : 'No notes yet'}
-            description={search ? 'Try a different search term' : 'Create encrypted notes to keep your thoughts private'}
-            actionLabel={search ? undefined : 'Create Note'}
+            title={search ? t('common.noResults') : t('notes.empty')}
+            description={search ? t('common.noResults') : t('notes.emptyDesc')}
+            actionLabel={search ? undefined : t('notes.create')}
             onAction={search ? undefined : handleCreate}
           />
         ) : (
@@ -168,12 +171,12 @@ export default function NotesScreen() {
             >
               <View style={styles.noteHeader}>
                 <Typography variant="bodyLarge" numberOfLines={1} style={styles.noteTitle}>
-                  {item.title || 'Untitled'}
+                  {item.title || t('notes.untitled')}
                 </Typography>
                 {item.isPinned && <Icon name="pin" size={16} color={colors.primary} />}
               </View>
               <Typography variant="bodySmall" color={colors.onSurfaceVariant} numberOfLines={2}>
-                {item.content || 'No content'}
+                {item.content || t('notes.noContent')}
               </Typography>
               <View style={styles.noteFooter}>
                 <Typography variant="labelSmall" color={colors.onSurfaceVariant}>
@@ -192,7 +195,7 @@ export default function NotesScreen() {
           ))
         )}
       </ScrollView>
-      <FloatingButton icon="plus" onPress={handleCreate} accessibilityLabel="Create new note" />
+      <FloatingButton icon="plus" onPress={handleCreate} accessibilityLabel={t('notes.create')} />
     </ScreenLayout>
   );
 }

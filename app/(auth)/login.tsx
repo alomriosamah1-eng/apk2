@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
@@ -7,80 +8,121 @@ import { Typography } from '@ui/components/atoms/Typography';
 import { Button } from '@ui/components/atoms/Button';
 import { Icon } from '@ui/components/atoms/Icon';
 import { Input } from '@ui/components/atoms/Input';
+import { Loading } from '@ui/components/atoms/Loading';
 import { useBiometrics } from '@ui/hooks/useBiometrics';
 import { useVaults } from '@ui/hooks/useVaults';
 import { useSecureStorage } from '@ui/hooks/useSecureStorage';
+import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
+import { DIContainer } from '@core/di/container';
+import { useSession } from '@ui/providers/SessionProvider';
 
 const REMEMBER_KEY = 'khaznati_remember_vault';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const { colors } = useTheme();
-  const { authenticate, isAvailable } = useBiometrics();
-  const { unlockVault, vaults, loadVaults } = useVaults();
+  const { authenticate, isAvailable, biometryType } = useBiometrics();
+  const { unlockVault, vaults, loading: vaultsLoading, loadVaults } = useVaults();
   const { getItem, setItem } = useSecureStorage();
+  const session = useSession();
   const { id: vaultId } = useLocalSearchParams<{ id: string }>();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  useEffect(() => {
+    loadVaults();
+  }, [loadVaults]);
+
+  const targetVault = useMemo(() => {
+    if (vaultId) return vaults.find((v) => v.id === vaultId) ?? null;
+    return vaults.length > 0 ? vaults[0] : null;
+  }, [vaults, vaultId]);
+
   const [rememberMe, setRememberMe] = useState(false);
-  const targetVault = (vaultId && vaults.find((v) => v.id === vaultId)) || (vaults.length > 0 ? vaults[0] : null);
 
   useEffect(() => {
-    if (vaults.length === 0) loadVaults();
-  }, [loadVaults, vaults.length]);
-
-  useEffect(() => {
+    if (!targetVault) return;
     (async () => {
-      const remembered = await getItem(REMEMBER_KEY + '_' + (targetVault?.id || ''));
+      const remembered = await getItem(REMEMBER_KEY + '_' + targetVault.id);
       if (remembered === 'true') setRememberMe(true);
     })();
   }, [getItem, targetVault?.id]);
 
   const handleLogin = useCallback(async () => {
-    if (!password.trim()) { setError('الرجاء إدخال كلمة المرور'); return; }
-    if (!targetVault) { setError('لم يتم العثور على الخزنة'); return; }
-    setLoading(true);
+    if (!targetVault) { setError(t('errors.vaultNotFound')); return; }
+    if (!password.trim()) { setError(t('auth.pinError')); return; }
+    setLoginLoading(true);
     setError(null);
     Keyboard.dismiss();
 
     const result = await unlockVault(targetVault.id, password);
     if (result.success) {
+      session.unlock(targetVault.id);
       if (rememberMe) {
         await setItem(REMEMBER_KEY + '_' + targetVault.id, 'true');
       }
-      router.replace('/(app)/(tabs)/vault');
+      router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: targetVault.id } });
     } else {
-      setError('كلمة المرور غير صحيحة. الرجاء المحاولة مرة أخرى');
+      setError(t('errors.invalidPin'));
       setPassword('');
     }
-    setLoading(false);
-  }, [password, targetVault, rememberMe, unlockVault, setItem]);
+    setLoginLoading(false);
+  }, [password, targetVault, rememberMe, unlockVault, setItem, t]);
 
   const handleBiometric = useCallback(async () => {
     if (!targetVault) return;
-    const success = await authenticate('افتح الخزنة بالبصمة');
-    if (success) {
-      const result = await unlockVault(targetVault.id, '');
-      if (result.success) {
-        router.replace('/(app)/(tabs)/vault');
-      } else {
-        setError('فشل فتح الخزنة بالبصمة');
-      }
+    const authSuccess = await authenticate(t('settings.biometricAuthPrompt'));
+    if (!authSuccess) return;
+
+    const biometricUseCase = DIContainer.resolve<BiometricUnlockUseCase>('BiometricUnlockUseCase');
+    const result = await biometricUseCase.execute(targetVault.id);
+    if (result.success) {
+      session.unlock(targetVault.id);
+      router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: targetVault.id } });
+    } else {
+      setError(t('errors.biometricFailed'));
     }
-  }, [targetVault, authenticate, unlockVault]);
+  }, [targetVault, authenticate, t]);
 
   const handlePasswordChange = useCallback((text: string) => {
     setPassword(text);
     setError(null);
   }, []);
 
-  if (vaults.length === 0 && !targetVault) {
+  if (vaultsLoading || vaults.length === 0) {
+    if (vaultId && vaults.length > 0 && !targetVault) {
+      return (
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.centerContent}>
+            <Icon name="shield-off" size={64} color={colors.onSurfaceVariant} />
+            <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.noVaultText}>{t('errors.vaultNotFound')}</Typography>
+            <Button title={t('vault.title')} onPress={() => router.push('/(app)/(tabs)/vault')} variant="primary" fullWidth style={styles.button} />
+          </View>
+        </View>
+      );
+    }
+    if (vaults.length === 0 && !vaultsLoading) {
+      return (
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.centerContent}>
+            <Icon name="shield-lock" size={64} color={colors.onSurfaceVariant} />
+            <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.noVaultText}>{t('vault.empty')}</Typography>
+            <Button title={t('common.back')} onPress={() => router.push('/(auth)/welcome')} variant="ghost" fullWidth style={styles.button} />
+          </View>
+        </View>
+      );
+    }
+    return <Loading fullScreen />;
+  }
+
+  if (!targetVault) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
-          <Icon name="shield-lock" size={64} color={colors.onSurfaceVariant} />
-          <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.noVaultText}>لا توجد خزنة مسجلة</Typography>
-          <Button title="إنشاء خزنة جديدة" onPress={() => router.push('/(auth)/create-vault')} variant="primary" fullWidth style={styles.button} />
+          <Icon name="shield-off" size={64} color={colors.onSurfaceVariant} />
+          <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.noVaultText}>{t('errors.vaultNotFound')}</Typography>
+          <Button title={t('vault.title')} onPress={() => router.push('/(app)/(tabs)/vault')} variant="primary" fullWidth style={styles.button} />
         </View>
       </View>
     );
@@ -94,20 +136,16 @@ export default function LoginScreen() {
             <View style={[styles.iconContainer, { backgroundColor: colors.primaryContainer }]}>
               <Icon name="lock" size={40} color={colors.primary} />
             </View>
-            {targetVault && (
-              <>
-                <Typography variant="headlineMedium">مرحباً بعودتك</Typography>
-                <Typography variant="titleSmall" color={colors.onSurfaceVariant}>{targetVault.name}</Typography>
-              </>
-            )}
+            <Typography variant="headlineMedium">{t('auth.welcomeBack')}</Typography>
+            <Typography variant="titleSmall" color={colors.onSurfaceVariant}>{targetVault.name}</Typography>
           </View>
 
           <View style={styles.form}>
             <Input
-              label="كلمة المرور"
+              label={t('auth.pinCode')}
               value={password}
               onChangeText={handlePasswordChange}
-              placeholder="أدخل كلمة المرور"
+              placeholder={t('auth.pinPlaceholder')}
               secureTextEntry
               showSecureToggle
               returnKeyType="done"
@@ -119,25 +157,25 @@ export default function LoginScreen() {
               <TouchableWithoutFeedback onPress={() => setRememberMe(!rememberMe)}>
                 <View style={styles.rememberTouchable}>
                   <Icon name={rememberMe ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={rememberMe ? colors.primary : colors.onSurfaceVariant} />
-                  <Typography variant="bodySmall" color={colors.onSurfaceVariant} style={styles.rememberLabel}>تذكرني</Typography>
+                  <Typography variant="bodySmall" color={colors.onSurfaceVariant} style={styles.rememberLabel}>{t('auth.rememberMe')}</Typography>
                 </View>
               </TouchableWithoutFeedback>
             </View>
 
-            <Button title={loading ? 'جاري فتح الخزنة...' : 'فتح الخزنة'} onPress={handleLogin} variant="primary" fullWidth size="lg" loading={loading} disabled={!password.trim()} style={styles.button} />
+            <Button title={loginLoading ? t('common.loading') : t('auth.unlock')} onPress={handleLogin} variant="primary" fullWidth size="lg" loading={loginLoading} disabled={!password.trim()} style={styles.button} />
 
-            {isAvailable && targetVault && (
+            {isAvailable && (
               <Button
-                title="استخدام البصمة"
+                title={t('auth.enableBiometric', { biometricType: '' })}
                 onPress={handleBiometric}
                 variant="glass"
                 fullWidth
-                icon={<Icon name="fingerprint" size={20} color={colors.primary} />}
+                icon={<Icon name={biometryType === 'fingerprint' ? 'fingerprint' : 'face-recognition'} size={20} color={colors.primary} />}
                 style={styles.biometric}
               />
             )}
 
-            <Button title="العودة إلى الترحيب" onPress={() => router.back()} variant="ghost" fullWidth style={styles.backButton} />
+            <Button title={t('common.back')} onPress={() => router.back()} variant="ghost" fullWidth style={styles.backButton} />
           </View>
         </KeyboardAvoidingView>
       </View>

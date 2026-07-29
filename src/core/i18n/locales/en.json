@@ -26,7 +26,8 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "add": "Add"
   },
   "auth": {
     "welcome": "Welcome to Khaznati",
@@ -55,7 +56,15 @@
     "pinError": "Please enter your PIN",
     "pinLengthError": "PIN must be at least 4 digits",
     "pinMismatch": "PINs do not match",
-    "nameRequired": "Please enter a vault name"
+    "nameRequired": "Please enter a vault name",
+    "getStarted": "Get Started",
+    "existingVault": "I already have a vault",
+    "rememberMe": "Remember Me",
+    "selectIcon": "Choose Icon",
+    "selectColor": "Choose Color",
+    "faceId": "Face ID",
+    "iconA11y": "Icon {{name}}",
+    "colorA11y": "Color {{hex}}"
   },
   "vault": {
     "title": "Vaults",
@@ -73,12 +82,26 @@
     "deleteConfirm": "Delete this vault?",
     "deleteWarning": "All files and data inside this vault will be permanently deleted"
   },
+  "welcome": {
+    "features": {
+      "secureStorage": "Secure Storage",
+      "secureStorageDesc": "Encrypt and protect your sensitive files",
+      "biometricLock": "Biometric Lock",
+      "biometricLockDesc": "Unlock with your fingerprint or face",
+      "backup": "Backup",
+      "backupDesc": "Never lose your data with encrypted backups"
+    }
+  },
   "files": {
     "title": "Files",
     "empty": "No files yet",
     "emptyDesc": "Add files to your vault",
     "addFile": "Add File",
     "addFolder": "Create Folder",
+    "preview": "Preview",
+    "videoPlayer": "Video Player",
+    "fileType": "{{ext}} File",
+    "noFileSelected": "No file selected",
     "folderName": "Folder Name",
     "folderNamePlaceholder": "Enter folder name",
     "search": "Search files",
@@ -101,7 +124,10 @@
     "videos": "Videos",
     "audio": "Audio",
     "empty": "No media yet",
-    "emptyDesc": "Add photos and videos to your vault"
+    "emptyDesc": "Add photos and videos to your vault",
+    "export": "Export to Gallery",
+    "exportSuccess": "Photo exported to gallery",
+    "deleteConfirm": "Delete this photo?"
   },
   "notes": {
     "title": "Notes",
@@ -116,7 +142,9 @@
     "pinned": "Pinned",
     "unpin": "Unpin",
     "pin": "Pin",
-    "search": "Search notes"
+    "search": "Search notes",
+    "untitled": "Untitled",
+    "noContent": "No content"
   },
   "passwords": {
     "title": "Passwords",
@@ -144,6 +172,7 @@
     "deleteWarning": "This action cannot be undone",
     "generatePassword": "Generate Password",
     "search": "Search passwords",
+    "savedCount": "{{count}} saved",
     "categories": {
       "social": "Social",
       "email": "Email",
@@ -175,6 +204,14 @@
     "clipboard": "Clipboard Protection",
     "rootDetection": "Root Detection",
     "secureDelete": "Secure Delete",
+    "data": "Data",
+    "appearance": "Appearance",
+    "clearAllData": "Clear All Data",
+    "lockAllVaults": "Lock All Vaults",
+    "quickExit": "Quick Exit",
+    "activityLog": "Activity Log",
+    "system": "System",
+    "securitySettings": "Security Settings",
     "storage": "Storage",
     "storageUsed": "Storage Used",
     "storageFree": "Storage Free",
@@ -196,6 +233,14 @@
     "after15min": "After 15 minutes",
     "after30min": "After 30 minutes",
     "thumbnailQuality": "Thumbnail Quality",
+    "backupDialogTitle": "Create Backup",
+    "backupDialogMessage": "Backup saved to:\n{{path}}",
+    "noDatabaseBackup": "No database found to backup",
+    "aboutDialog": "Version 1.0.0\n\nA secure, encrypted vault for your digital life.\n\nBuilt with Expo and React Native.",
+    "licensesDialog": "This app uses open-source software:\n\n• Expo\n• React Native\n• SQLite\n• Various MIT-licensed packages",
+    "autoLockDialogTitle": "Auto Lock",
+    "autoLockDialogMessage": "Choose when to auto-lock your vaults",
+    "biometricAuthPrompt": "Authenticate to toggle biometrics",
     "low": "Low",
     "medium": "Medium",
     "high": "High"
@@ -219,6 +264,12 @@
     "importFailed": "Import failed",
     "backupFailed": "Backup creation failed",
     "restoreFailed": "Backup restoration failed"
+  },
+  "activityLog": {
+    "title": "Activity Log",
+    "empty": "No activity yet",
+    "clear": "Clear Log",
+    "clearConfirm": "Clear the activity log?"
   },
   "notifications": {
     "title": "Notifications",

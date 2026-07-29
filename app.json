@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "khaznati",
+
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -38,8 +39,17 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "jsEngine": "hermes",
+      "enableProguardInRelease": true,
+      "enableHermesCodegen": true
     },
+    "updates": {
+      "enabled": false
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": [
       "expo-router",
       [
@@ -49,8 +59,7 @@
         }
       ],
       "expo-secure-store",
-      "expo-local-authentication",
-      "expo-notifications"
+      "expo-local-authentication"
     ]
   }
 }

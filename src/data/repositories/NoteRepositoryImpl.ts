@@ -4,17 +4,31 @@ import { Result, success, failure, DatabaseError } from '@core/errors';
 import { NoteDTO } from '@data/dto/NoteDTO';
 import { NoteMapper } from '@data/mappers/NoteMapper';
 import { DatabaseService } from '@data/database/DatabaseService';
+import { encryptData, decryptData, generateEncryptionKey } from '@core/utils/crypto';
+import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
+import { DIContainer } from '@core/di/container';
 
-/** Implementation of INoteRepository backed by SQLite via DatabaseService. */
 export class NoteRepositoryImpl implements INoteRepository {
   private mapper = new NoteMapper();
 
   constructor(private db: DatabaseService) {}
 
-  /** Inserts a new note record into the database. */
+  private async getVaultKey(vaultId: string): Promise<string> {
+    const storage = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
+    const keyKey = `note_vault_key_${vaultId}`;
+    let key = await storage.get(keyKey);
+    if (!key) {
+      key = await generateEncryptionKey();
+      await storage.set(keyKey, key);
+    }
+    return key;
+  }
+
   async create(note: Note): Promise<Result<Note>> {
     try {
-      const dto = this.mapper.toDTO(note);
+      const vaultKey = await this.getVaultKey(note.vaultId);
+      const encryptedContent = await encryptData(vaultKey, note.encryptedContent);
+      const dto = this.mapper.toDTO({ ...note, encryptedContent });
       await this.db.executeSql(
         `INSERT INTO notes (id, vault_id, title, encrypted_content, is_encrypted, color, is_pinned, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -27,35 +41,36 @@ export class NoteRepositoryImpl implements INoteRepository {
     }
   }
 
-  /** Finds a note by its ID, or null if not found. */
   async findById(id: string): Promise<Result<Note | null>> {
     try {
       const row = await this.db.queryOne<NoteDTO>('SELECT * FROM notes WHERE id = ?', [id]);
-      return success(row ? this.mapper.toEntity(row) : null);
+      if (!row) return success(null);
+      return this.decryptNote(row);
     } catch (error) {
       return failure(new DatabaseError('Failed to find note', (error as Error).message));
     }
   }
 
-  /** Finds all notes in a vault, ordered by pinned status then updated date. */
   async findByVaultId(vaultId: string): Promise<Result<Note[]>> {
     try {
       const rows = await this.db.query<NoteDTO>(
         'SELECT * FROM notes WHERE vault_id = ? ORDER BY is_pinned DESC, updated_at DESC',
         [vaultId],
       );
-      return success(rows.map((r) => this.mapper.toEntity(r)));
+      const notes = await Promise.all(rows.map((r) => this.decryptNote(r)));
+      return success(notes.flatMap((n) => (n.success ? [n.data] : [])));
     } catch (error) {
       return failure(new DatabaseError('Failed to find notes', (error as Error).message));
     }
   }
 
-  /** Updates an existing note record. */
   async update(note: Note): Promise<Result<Note>> {
     try {
-      const dto = this.mapper.toDTO(note);
+      const vaultKey = await this.getVaultKey(note.vaultId);
+      const encryptedContent = await encryptData(vaultKey, note.encryptedContent);
+      const dto = this.mapper.toDTO({ ...note, encryptedContent });
       await this.db.executeSql(
-        `UPDATE notes SET title = ?, encrypted_content = ?, is_encrypted = ?, color = ?, 
+        `UPDATE notes SET title = ?, encrypted_content = ?, is_encrypted = ?, color = ?,
          is_pinned = ?, updated_at = ? WHERE id = ?`,
         [dto.title, dto.encrypted_content, dto.is_encrypted, dto.color,
          dto.is_pinned, dto.updated_at, dto.id],
@@ -66,7 +81,6 @@ export class NoteRepositoryImpl implements INoteRepository {
     }
   }
 
-  /** Deletes a note by its ID. */
   async delete(id: string): Promise<Result<void>> {
     try {
       await this.db.executeSql('DELETE FROM notes WHERE id = ?', [id]);
@@ -76,7 +90,6 @@ export class NoteRepositoryImpl implements INoteRepository {
     }
   }
 
-  /** Toggles the pinned flag on a note. */
   async togglePin(id: string): Promise<Result<void>> {
     try {
       await this.db.executeSql(
@@ -89,16 +102,28 @@ export class NoteRepositoryImpl implements INoteRepository {
     }
   }
 
-  /** Searches notes by title or content within a vault. */
   async search(vaultId: string, query: string): Promise<Result<Note[]>> {
     try {
       const rows = await this.db.query<NoteDTO>(
-        'SELECT * FROM notes WHERE vault_id = ? AND (title LIKE ? OR encrypted_content LIKE ?) ORDER BY updated_at DESC',
-        [vaultId, `%${query}%`, `%${query}%`],
+        'SELECT * FROM notes WHERE vault_id = ? AND (title LIKE ?) ORDER BY updated_at DESC',
+        [vaultId, `%${query}%`],
       );
-      return success(rows.map((r) => this.mapper.toEntity(r)));
+      const notes = await Promise.all(rows.map((r) => this.decryptNote(r)));
+      return success(notes.flatMap((n) => (n.success ? [n.data] : [])));
     } catch (error) {
       return failure(new DatabaseError('Failed to search notes', (error as Error).message));
     }
+  }
+
+  private async decryptNote(row: NoteDTO): Promise<Result<Note>> {
+    const note = this.mapper.toEntity(row);
+    try {
+      const vaultKey = await this.getVaultKey(note.vaultId);
+      note.encryptedContent = await decryptData(vaultKey, row.encrypted_content);
+      note.isEncrypted = true;
+    } catch {
+      note.encryptedContent = '[encrypted]';
+    }
+    return success(note);
   }
 }

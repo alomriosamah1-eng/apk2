@@ -1,7 +1,9 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Crypto from 'expo-crypto';
+import { encryptData, decryptData, generateEncryptionKey } from '@core/utils/crypto';
+import { SecureStorageSource } from './SecureStorageSource';
+import { DIContainer } from '@core/di/container';
 
-/** Low-level file-system operations for reading, writing, and managing encrypted files on disk. */
 export class FileSystemSource {
   private basePath: string;
 
@@ -9,7 +11,6 @@ export class FileSystemSource {
     this.basePath = `${FileSystem.documentDirectory}khaznati`;
   }
 
-  /** Creates all required directories if they do not exist. */
   async initialize(): Promise<void> {
     const dirs = [
       this.basePath,
@@ -25,71 +26,86 @@ export class FileSystemSource {
         await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
       }
     }
+
+    const nomediaPath = `${this.basePath}/.nomedia`;
+    const nomediaInfo = await FileSystem.getInfoAsync(nomediaPath);
+    if (!nomediaInfo.exists) {
+      await FileSystem.writeAsStringAsync(nomediaPath, '', {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    }
   }
 
-  /** Writes base64-encoded data to a file under the files directory. */
+  private async getVaultKey(vaultId: string): Promise<string> {
+    const storage = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
+    const keyKey = `file_vault_key_${vaultId}`;
+    let key = await storage.get(keyKey);
+    if (!key) {
+      key = await generateEncryptionKey();
+      await storage.set(keyKey, key);
+    }
+    return key;
+  }
+
   async writeFile(path: string, data: string): Promise<void> {
     const fullPath = `${this.basePath}/files/${path}`;
-    await FileSystem.writeAsStringAsync(fullPath, data, {
+    const vaultId = path.split('/')[0] || 'default';
+    const vaultKey = await this.getVaultKey(vaultId);
+    const encrypted = await encryptData(vaultKey, data);
+    await FileSystem.writeAsStringAsync(fullPath, encrypted, {
       encoding: FileSystem.EncodingType.Base64,
     });
   }
 
-  /** Reads a file from the files directory and returns its base64-encoded content. */
   async readFile(path: string): Promise<string> {
     const fullPath = `${this.basePath}/files/${path}`;
-    return FileSystem.readAsStringAsync(fullPath, {
+    const vaultId = path.split('/')[0] || 'default';
+    const vaultKey = await this.getVaultKey(vaultId);
+    const encrypted = await FileSystem.readAsStringAsync(fullPath, {
       encoding: FileSystem.EncodingType.Base64,
     });
+    return decryptData(vaultKey, encrypted);
   }
 
-  /** Deletes a file from the files directory. */
   async deleteFile(path: string): Promise<void> {
     const fullPath = `${this.basePath}/files/${path}`;
     await FileSystem.deleteAsync(fullPath, { idempotent: true });
   }
 
-  /** Checks whether a file exists in the files directory. */
   async fileExists(path: string): Promise<boolean> {
     const fullPath = `${this.basePath}/files/${path}`;
     const info = await FileSystem.getInfoAsync(fullPath);
     return info.exists;
   }
 
-  /** Returns the size in bytes of a file in the files directory. */
   async getFileSize(path: string): Promise<number> {
     const fullPath = `${this.basePath}/files/${path}`;
     const info = await FileSystem.getInfoAsync(fullPath);
     return (info as FileSystem.FileInfo & { size: number }).size ?? 0;
   }
 
-  /** Copies a file within the files directory. */
   async copyFile(source: string, destination: string): Promise<void> {
     const srcPath = `${this.basePath}/files/${source}`;
     const destPath = `${this.basePath}/files/${destination}`;
     await FileSystem.copyAsync({ from: srcPath, to: destPath });
   }
 
-  /** Moves a file within the files directory. */
   async moveFile(source: string, destination: string): Promise<void> {
     const srcPath = `${this.basePath}/files/${source}`;
     const destPath = `${this.basePath}/files/${destination}`;
     await FileSystem.moveAsync({ from: srcPath, to: destPath });
   }
 
-  /** Lists file names in a subdirectory under the files directory. */
   async listFiles(directory: string): Promise<string[]> {
     const dirPath = `${this.basePath}/files/${directory}`;
     return FileSystem.readDirectoryAsync(dirPath);
   }
 
-  /** Returns storage usage information for the base directory. */
   async getStorageInfo(): Promise<{ used: number; free: number }> {
     const totalSize = await this.calculateDirectorySize(this.basePath);
     return { used: totalSize, free: 0 };
   }
 
-  /** Overwrites a file with random data multiple times before deleting it. */
   async secureDelete(path: string): Promise<void> {
     const fullPath = `${this.basePath}/files/${path}`;
     const size = await this.getFileSize(path);
@@ -107,12 +123,10 @@ export class FileSystemSource {
     await this.deleteFile(path);
   }
 
-  /** Returns the base path for all file storage. */
   getBasePath(): string {
     return this.basePath;
   }
 
-  /** Returns the directory path for a specific vault. */
   getVaultPath(vaultId: string): string {
     return `${this.basePath}/files/${vaultId}`;
   }

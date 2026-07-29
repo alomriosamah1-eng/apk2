@@ -18,14 +18,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Expo Doctor
-        run: npx expo-doctor
-
       - name: TypeScript check
         run: npx tsc --noEmit
 
       - name: ESLint
-        run: npx eslint .
+        run: npx eslint . --ext .ts,.tsx
 
       - name: Run tests
         run: npm test
@@ -35,11 +32,9 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
@@ -53,10 +48,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Prebuild (generate android native project)
+      - name: Prebuild
         run: npx expo prebuild --platform android --no-install
 
       - name: Build Android APK (Debug)

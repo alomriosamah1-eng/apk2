@@ -12,38 +12,10 @@ export class DomainError extends Error {
   }
 }
 
-/** Error thrown when a requested vault does not exist. */
-export class VaultNotFoundError extends DomainError {
-  constructor(vaultId: string) {
-    super(`Vault ${vaultId} not found`, 'VAULT_NOT_FOUND', { vaultId });
-  }
-}
-
-/** Error thrown when a requested item does not exist. */
-export class ItemNotFoundError extends DomainError {
-  constructor(itemId: string) {
-    super(`Item ${itemId} not found`, 'ITEM_NOT_FOUND', { itemId });
-  }
-}
-
 /** Error thrown when user authentication fails. */
 export class AuthenticationError extends DomainError {
   constructor(reason: string) {
     super(`Authentication failed: ${reason}`, 'AUTH_FAILED', { reason });
-  }
-}
-
-/** Error thrown when an encryption operation fails. */
-export class EncryptionError extends DomainError {
-  constructor(cause: string) {
-    super(`Encryption failed: ${cause}`, 'ENCRYPTION_FAILED', { cause });
-  }
-}
-
-/** Error thrown when a decryption operation fails. */
-export class DecryptionError extends DomainError {
-  constructor(cause: string) {
-    super(`Decryption failed: ${cause}`, 'DECRYPTION_FAILED', { cause });
   }
 }
 
@@ -61,27 +33,6 @@ export class ValidationError extends DomainError {
       field,
       reason,
     });
-  }
-}
-
-/** Error thrown when a backup or restore operation fails. */
-export class BackupError extends DomainError {
-  constructor(message: string, cause?: string) {
-    super(message, 'BACKUP_ERROR', { cause });
-  }
-}
-
-/** Error thrown when the user lacks the required permission. */
-export class PermissionError extends DomainError {
-  constructor(permission: string) {
-    super(`Permission denied: ${permission}`, 'PERMISSION_DENIED', { permission });
-  }
-}
-
-/** Error thrown when a storage operation fails. */
-export class StorageError extends DomainError {
-  constructor(message: string, cause?: string) {
-    super(message, 'STORAGE_ERROR', { cause });
   }
 }
 

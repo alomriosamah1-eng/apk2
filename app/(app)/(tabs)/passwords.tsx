@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, RefreshControl, TouchableOpacity, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { router } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
@@ -14,6 +15,7 @@ import { Icon } from '@ui/components/atoms/Icon';
 import { Input } from '@ui/components/atoms/Input';
 import { Button } from '@ui/components/atoms/Button';
 import { useSecureStorage } from '@ui/hooks/useSecureStorage';
+import { useTranslation } from 'react-i18next';
 
 interface PasswordEntry {
   id: string;
@@ -26,11 +28,12 @@ interface PasswordEntry {
   createdAt: number;
 }
 
-const CATEGORIES = ['Social', 'Email', 'Finance', 'Shopping', 'Work', 'Entertainment', 'Other'];
+const CATEGORIES = ['social', 'email', 'finance', 'shopping', 'work', 'entertainment', 'other'];
 const STORAGE_KEY = 'khaznati_passwords';
 
 export default function PasswordsScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { getItem, setItem } = useSecureStorage();
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +41,7 @@ export default function PasswordsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('Social');
+  const [selectedCategory, setSelectedCategory] = useState('social');
   const [formData, setFormData] = useState({ serviceName: '', serviceUrl: '', username: '', password: '', notes: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPasswords, setShowPasswords] = useState<Set<string>>(new Set());
@@ -129,20 +132,20 @@ export default function PasswordsScreen() {
 
   if (showForm) {
     return (
-      <ScreenLayout title={editingId ? 'Edit Password' : 'Add Password'} showBack onBack={() => { setShowForm(false); setEditingId(null); }}>
+      <ScreenLayout title={editingId ? t('passwords.edit') : t('passwords.add')} showBack onBack={() => { setShowForm(false); setEditingId(null); }}>
         <ScrollView contentContainerStyle={styles.formContainer} keyboardShouldPersistTaps="handled">
-          <Input label="Service Name" value={formData.serviceName} onChangeText={(t) => setFormData((p) => ({ ...p, serviceName: t }))} placeholder="e.g. Facebook" />
-          <Input label="Service URL" value={formData.serviceUrl} onChangeText={(t) => setFormData((p) => ({ ...p, serviceUrl: t }))} placeholder="https://" keyboardType="url" />
-          <Input label="Username" value={formData.username} onChangeText={(t) => setFormData((p) => ({ ...p, username: t }))} placeholder="Enter username" />
+          <Input label={t('passwords.serviceName')} value={formData.serviceName} onChangeText={(t) => setFormData((p) => ({ ...p, serviceName: t }))} placeholder={t('passwords.serviceNamePlaceholder')} />
+          <Input label={t('passwords.serviceUrl')} value={formData.serviceUrl} onChangeText={(t) => setFormData((p) => ({ ...p, serviceUrl: t }))} placeholder={t('passwords.serviceUrlPlaceholder')} keyboardType="url" />
+          <Input label={t('passwords.username')} value={formData.username} onChangeText={(t) => setFormData((p) => ({ ...p, username: t }))} placeholder={t('passwords.usernamePlaceholder')} />
           <View style={styles.passwordRow}>
             <View style={styles.passwordInput}>
-              <Input label="Password" value={formData.password} onChangeText={(t) => setFormData((p) => ({ ...p, password: t }))} placeholder="Enter password" secureTextEntry />
+              <Input label={t('passwords.password')} value={formData.password} onChangeText={(t) => setFormData((p) => ({ ...p, password: t }))} placeholder={t('passwords.passwordPlaceholder')} secureTextEntry />
             </View>
             <TouchableOpacity onPress={generatePassword} style={[styles.generateBtn, { backgroundColor: colors.primaryContainer }]}>
               <Icon name="auto-fix" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
-          <Input label="Notes" value={formData.notes} onChangeText={(t) => setFormData((p) => ({ ...p, notes: t }))} placeholder="Additional notes" />
+          <Input label={t('passwords.notes')} value={formData.notes} onChangeText={(t) => setFormData((p) => ({ ...p, notes: t }))} placeholder="Additional notes" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
@@ -151,19 +154,19 @@ export default function PasswordsScreen() {
                 style={[styles.categoryChip, { backgroundColor: selectedCategory === cat ? colors.primary : colors.surfaceVariant }]}
               >
                 <Typography variant="labelSmall" color={selectedCategory === cat ? '#FFFFFF' : colors.onSurface}>
-                  {cat}
+                  {t(`passwords.categories.${cat}`)}
                 </Typography>
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <Button title="Save" onPress={handleSave} variant="primary" fullWidth size="lg" disabled={!formData.serviceName || !formData.username || !formData.password} />
+          <Button title={t('common.save')} onPress={handleSave} variant="primary" fullWidth size="lg" disabled={!formData.serviceName || !formData.username || !formData.password} />
         </ScrollView>
       </ScreenLayout>
     );
   }
 
   if (loading && entries.length === 0) {
-    return <Loading fullScreen message="Loading passwords..." />;
+    return <Loading fullScreen message={t('common.loading')} />;
   }
 
   if (error && entries.length === 0) {
@@ -171,8 +174,8 @@ export default function PasswordsScreen() {
   }
 
   return (
-    <ScreenLayout title="Passwords" subtitle={`${entries.length} saved`}>
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Search passwords..." onClear={() => setSearch('')} />
+    <ScreenLayout title={t('passwords.title')} subtitle={t('passwords.savedCount', { count: entries.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
+      <SearchBar value={search} onChangeText={setSearch} placeholder={t('passwords.search')} onClear={() => setSearch('')} />
       <ScrollView
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
@@ -181,9 +184,9 @@ export default function PasswordsScreen() {
         {filtered.length === 0 ? (
           <EmptyState
             icon="lock-outline"
-            title={search ? 'No matching passwords' : 'No passwords saved'}
-            description={search ? 'Try a different search term' : 'Store your passwords securely encrypted'}
-            actionLabel={search ? undefined : 'Add Password'}
+            title={search ? t('common.noResults') : t('passwords.empty')}
+            description={search ? t('common.noResults') : t('passwords.emptyDesc')}
+            actionLabel={search ? undefined : t('passwords.add')}
             onAction={search ? undefined : () => setShowForm(true)}
           />
         ) : (
@@ -213,7 +216,7 @@ export default function PasswordsScreen() {
           ))
         )}
       </ScrollView>
-      <FloatingButton icon="plus" onPress={() => { setShowForm(true); setEditingId(null); setFormData({ serviceName: '', serviceUrl: '', username: '', password: '', notes: '' }); }} accessibilityLabel="Add password" />
+      <FloatingButton icon="plus" onPress={() => { setShowForm(true); setEditingId(null); setFormData({ serviceName: '', serviceUrl: '', username: '', password: '', notes: '' }); }} accessibilityLabel={t('passwords.add')} />
     </ScreenLayout>
   );
 }

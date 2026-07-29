@@ -7,10 +7,8 @@ export { getFileExtension, getFileNameWithoutExtension, formatFileSize, getMimeC
 /** Secure / platform utilities. */
 export { isAndroid, isDev, delay, clamp, debounce, generateSalt, hashPin } from './secure';
 /** Resilience and retry utilities. */
-export { withRetry, CircuitBreaker } from './resilience';
+export { withRetry } from './resilience';
 /** Validation utilities. */
 export { required, minLength, maxLength, matchesPattern, isType, validate } from './validation';
 /** Logging service. */
 export { logger, Logger } from './logger';
-/** Health check service. */
-export { HealthService } from './health';

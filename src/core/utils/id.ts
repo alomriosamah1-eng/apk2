@@ -1,13 +1,25 @@
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 
-/** Generates a full UUID v4 identifier. */
+function bytesToHex(bytes: Uint8Array): string {
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += (bytes[i] as number).toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+/** Generates a full UUID v4 identifier using expo-crypto (Hermes-compatible). */
 export function generateId(): string {
-  return uuidv4();
+  const bytes = Crypto.getRandomBytes(16);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytesToHex(bytes);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** Generates a short identifier from the first segment of a UUID v4. */
 export function generateShortId(): string {
-  return uuidv4().split('-')[0] as string;
+  return generateId().split('-')[0] as string;
 }
 
 /** Checks whether a string is a valid UUID v4. */

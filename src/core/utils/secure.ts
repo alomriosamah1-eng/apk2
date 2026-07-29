@@ -44,10 +44,12 @@ export async function generateSalt(): Promise<string> {
   return bytesToHex(bytes);
 }
 
-/** Hashes a PIN with the given salt using SHA-256. */
+/** Hashes a PIN with the given salt using iterative SHA-256 (PBKDF2-like). */
 export async function hashPin(pin: string, salt: string): Promise<string> {
-  return Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    pin + salt,
-  );
+  const iterations = 10000;
+  let hash = pin + salt;
+  for (let i = 0; i < iterations; i++) {
+    hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, hash);
+  }
+  return hash;
 }

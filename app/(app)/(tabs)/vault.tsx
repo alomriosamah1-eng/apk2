@@ -1,79 +1,188 @@
-import { useCallback, memo } from 'react';
-import { View, StyleSheet, RefreshControl } from 'react-native';
-import { router } from 'expo-router';
-import { FlashList } from '@shopify/flash-list';
+import { useState, useCallback, memo } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, BackHandler, Platform } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
-import { spacing } from '@core/theme';
-import { VaultCard } from '@ui/components/organisms/VaultCard';
-import { FloatingButton } from '@ui/components/molecules/FloatingButton';
+import { spacing, borderRadius, elevations } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
-import { EmptyState } from '@ui/components/atoms/EmptyState';
-import { Loading } from '@ui/components/atoms/Loading';
-import { ErrorView } from '@ui/components/atoms/ErrorView';
+import { Icon } from '@ui/components/atoms/Icon';
+import { Typography } from '@ui/components/atoms/Typography';
+import AddOptionsSheet from '@ui/components/organisms/AddOptionsSheet';
+import VaultListSheet from '@ui/components/organisms/VaultListSheet';
 import { useVaults } from '@ui/hooks/useVaults';
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_GAP = spacing.sm;
+const HORIZONTAL_PADDING = spacing.lg;
+const COLUMNS = 3;
+const CARD_WIDTH = Math.floor((SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP * (COLUMNS - 1)) / COLUMNS);
+const CARD_HEIGHT = 120;
+
+interface QuickCard {
+  id: string;
+  icon: keyof typeof import('@expo/vector-icons').MaterialCommunityIcons.glyphMap;
+  labelKey: string;
+  color: string;
+  iconBg: string;
+}
+
 function VaultScreenContent() {
+  const { t } = useTranslation();
   const { colors } = useTheme();
-  const { vaults, loading, error, loadVaults } = useVaults();
+  const { vaults } = useVaults();
+  const { vaultId: activeVaultId } = useLocalSearchParams<{ vaultId: string }>();
+  const currentVault = activeVaultId ? vaults.find((v) => v.id === activeVaultId) : vaults[0];
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showVaultList, setShowVaultList] = useState(false);
 
-  const handleVaultPress = useCallback((item: { id: string; isLocked: boolean }) => {
-    if (item.isLocked) {
-      router.push({ pathname: '/(auth)/login', params: { id: item.id } });
-    } else {
-      router.push({ pathname: '/(app)/(tabs)/files', params: { vaultId: item.id } });
+  const quickCards: QuickCard[] = [
+    { id: 'files', icon: 'folder', labelKey: 'files.title', color: '#6C63FF', iconBg: colors.primaryContainer },
+    { id: 'photos', icon: 'image', labelKey: 'media.photos', color: '#FF6584', iconBg: colors.tertiaryContainer },
+    { id: 'video', icon: 'video', labelKey: 'media.videos', color: '#03DAC5', iconBg: colors.secondaryContainer },
+    { id: 'audio', icon: 'music', labelKey: 'media.audio', color: '#FFB74D', iconBg: '#FFF3E0' },
+    { id: 'notes', icon: 'note-text', labelKey: 'notes.title', color: '#66BB6A', iconBg: '#E8F5E9' },
+    { id: 'passwords', icon: 'key', labelKey: 'passwords.title', color: '#AB47BC', iconBg: '#F3E5F5' },
+    { id: 'locked', icon: 'exit-run', labelKey: 'settings.quickExit', color: '#EF5350', iconBg: '#FFEBEE' },
+  ];
+
+  const handleCardPress = useCallback((card: QuickCard) => {
+    const vid = activeVaultId || currentVault?.id;
+    switch (card.id) {
+      case 'files':
+        router.push({ pathname: '/(app)/(tabs)/files', params: { vaultId: vid } });
+        break;
+      case 'photos':
+        router.push({ pathname: '/(app)/(tabs)/media', params: { vaultId: vid } });
+        break;
+      case 'video':
+      case 'audio':
+        router.push({ pathname: '/(app)/(tabs)/files', params: { vaultId: vid } });
+        break;
+      case 'notes':
+        router.push({ pathname: '/(app)/(tabs)/notes', params: { vaultId: vid } });
+        break;
+      case 'passwords':
+        router.push({ pathname: '/(app)/(tabs)/passwords', params: { vaultId: vid } });
+        break;
+      case 'locked':
+        if (Platform.OS === 'android') {
+          BackHandler.exitApp();
+        } else {
+          router.push('/(auth)/welcome');
+        }
+        break;
     }
+  }, [activeVaultId, currentVault?.id]);
+
+  const handleSettings = useCallback(() => {
+    router.push('/(app)/(tabs)/settings');
   }, []);
 
-  const handleCreateVault = useCallback(() => {
-    router.push('/(auth)/create-vault');
+  const handleVaultList = useCallback(() => {
+    setShowVaultList(true);
   }, []);
 
-  if (loading && vaults.length === 0) {
-    return <Loading fullScreen message="Loading vaults..." />;
-  }
-
-  if (error && vaults.length === 0) {
-    return <ErrorView message={error} onRetry={loadVaults} />;
-  }
+  const openAddSheet = useCallback(() => setShowAddSheet(true), []);
+  const closeAddSheet = useCallback(() => setShowAddSheet(false), []);
 
   return (
-    <ScreenLayout title="My Vaults" subtitle={`${vaults.length} vault${vaults.length !== 1 ? 's' : ''}`}>
-      <FlashList
-        data={vaults}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <VaultCard vault={item} onPress={() => handleVaultPress(item)} />
-        )}
-        contentContainerStyle={styles.list}
-        ItemSeparatorComponent={ItemSeparator}
-        ListEmptyComponent={
-          <EmptyState
-            icon="shield-plus"
-            title="No vaults yet"
-            description="Create your first secure vault to get started"
-            actionLabel="Create Vault"
-            onAction={handleCreateVault}
-          />
-        }
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={loadVaults} tintColor={colors.primary} />
-        }
-        showsVerticalScrollIndicator={false}
-      />
-      <FloatingButton icon="plus" onPress={handleCreateVault} accessibilityLabel="Create new vault" />
+    <ScreenLayout
+      title={t('app.name')}
+      subtitle={currentVault ? currentVault.name : t('vault.titleWithCount', { count: vaults.length })}
+      rightAction={
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleVaultList} accessibilityLabel={t('vault.title')}>
+            <Icon name="format-list-bulleted" size={24} color={colors.onSurface} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSettings} accessibilityLabel={t('settings.title')}>
+            <Icon name="cog" size={24} color={colors.onSurface} />
+          </TouchableOpacity>
+        </View>
+      }
+    >
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.grid}>
+          {quickCards.map((card) => (
+            <TouchableOpacity
+              key={card.id}
+              onPress={() => handleCardPress(card)}
+              style={[styles.card, { backgroundColor: colors.surface, ...elevations[2] }]}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.cardIcon, { backgroundColor: card.iconBg }]}>
+                <Icon name={card.icon} size={24} color={card.color} />
+              </View>
+              <Typography variant="bodySmall" style={styles.cardLabel}>
+                {t(card.labelKey)}
+              </Typography>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      <TouchableOpacity
+        onPress={openAddSheet}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        activeOpacity={0.8}
+        accessibilityLabel={t('common.add')}
+        accessibilityRole="button"
+      >
+        <Icon name="plus" size={28} color={colors.onPrimary} />
+      </TouchableOpacity>
+
+      <AddOptionsSheet visible={showAddSheet} onClose={closeAddSheet} />
+      <VaultListSheet visible={showVaultList} onClose={() => setShowVaultList(false)} />
     </ScreenLayout>
   );
 }
 
-const ItemSeparator = memo(function ItemSeparator() {
-  return <View style={{ height: spacing.md }} />;
-});
-
 export default memo(VaultScreenContent);
 
 const styles = StyleSheet.create({
-  list: {
-    padding: spacing.lg,
-    flexGrow: 1,
+  container: {
+    padding: HORIZONTAL_PADDING,
+    paddingTop: spacing.lg,
+    paddingBottom: 100,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CARD_GAP,
+  },
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  cardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardLabel: {
+    textAlign: 'center',
+    writingDirection: 'rtl',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    alignSelf: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    ...elevations[4],
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
   },
 });

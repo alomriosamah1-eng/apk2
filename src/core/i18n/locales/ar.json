@@ -26,7 +26,8 @@
     "enabled": "مفعل",
     "disabled": "معطل",
     "on": "تشغيل",
-    "off": "إيقاف"
+    "off": "إيقاف",
+    "add": "إضافة"
   },
   "auth": {
     "welcome": "مرحباً بك في خزنتي",
@@ -55,7 +56,15 @@
     "pinError": "الرجاء إدخال رمز PIN",
     "pinLengthError": "يجب أن يكون رمز PIN 4 أرقام على الأقل",
     "pinMismatch": "رمزا PIN غير متطابقين",
-    "nameRequired": "الرجاء إدخال اسم الخزنة"
+    "nameRequired": "الرجاء إدخال اسم الخزنة",
+    "getStarted": "ابدأ الآن",
+    "existingVault": "لدي خزنة بالفعل",
+    "rememberMe": "تذكرني",
+    "selectIcon": "اختر أيقونة",
+    "selectColor": "اختر لوناً",
+    "faceId": "الوجه",
+    "iconA11y": "أيقونة {{name}}",
+    "colorA11y": "لون {{hex}}"
   },
   "vault": {
     "title": "الخزائن",
@@ -70,12 +79,26 @@
     "deleteConfirm": "هل أنت متأكد من حذف هذه الخزنة؟",
     "deleteWarning": "سيتم حذف جميع الملفات والبيانات داخل هذه الخزنة بشكل دائم"
   },
+  "welcome": {
+    "features": {
+      "secureStorage": "تخزين آمن",
+      "secureStorageDesc": "تشفيّر وحماية ملفاتك الحساسة",
+      "biometricLock": "قفل بصمة",
+      "biometricLockDesc": "افتح الخزنة ببصمتك أو وجهك",
+      "backup": "نسخ احتياطي",
+      "backupDesc": "لا تفقد بياناتك أبداً بنسخ احتياطية مشفرة"
+    }
+  },
   "files": {
     "title": "الملفات",
     "empty": "لا توجد ملفات",
     "emptyDesc": "أضف ملفاتك إلى الخزنة",
     "addFile": "إضافة ملف",
     "addFolder": "إنشاء مجلد",
+    "preview": "معاينة",
+    "videoPlayer": "مشغل فيديو",
+    "fileType": "ملف {{ext}}",
+    "noFileSelected": "لم يتم تحديد ملف",
     "folderName": "اسم المجلد",
     "folderNamePlaceholder": "أدخل اسم المجلد",
     "search": "بحث في الملفات",
@@ -98,7 +121,10 @@
     "videos": "الفيديو",
     "audio": "الصوتيات",
     "empty": "لا توجد وسائط",
-    "emptyDesc": "أضف صوراً وفيديوهات إلى خزنتك"
+    "emptyDesc": "أضف صوراً وفيديوهات إلى خزنتك",
+    "export": "استخراج إلى المعرض",
+    "exportSuccess": "تم استخراج الصورة إلى معرض الصور",
+    "deleteConfirm": "حذف هذه الصورة؟"
   },
   "notes": {
     "title": "الملاحظات",
@@ -113,7 +139,9 @@
     "pinned": "مثبتة",
     "unpin": "إلغاء التثبيت",
     "pin": "تثبيت",
-    "search": "بحث في الملاحظات"
+    "search": "بحث في الملاحظات",
+    "untitled": "بدون عنوان",
+    "noContent": "لا يوجد محتوى"
   },
   "passwords": {
     "title": "كلمات المرور",
@@ -141,6 +169,7 @@
     "deleteWarning": "لا يمكن التراجع عن هذا الإجراء",
     "generatePassword": "توليد كلمة مرور",
     "search": "بحث في كلمات المرور",
+    "savedCount": "{{count}} محفوظة",
     "categories": {
       "social": "تواصل اجتماعي",
       "email": "بريد إلكتروني",
@@ -172,6 +201,14 @@
     "clipboard": "حماية الحافظة",
     "rootDetection": "كشف الجذر",
     "secureDelete": "الحذف الآمن",
+    "data": "البيانات",
+    "appearance": "المظهر",
+    "clearAllData": "مسح جميع البيانات",
+    "lockAllVaults": "قفل جميع الخزائن",
+    "quickExit": "خروج سريع",
+    "activityLog": "سجل النشاطات",
+    "system": "النظام",
+    "securitySettings": "إعدادات الأمان",
     "storage": "التخزين",
     "storageUsed": "المساحة المستخدمة",
     "storageFree": "المساحة المتبقية",
@@ -193,6 +230,14 @@
     "after15min": "بعد 15 دقيقة",
     "after30min": "بعد 30 دقيقة",
     "thumbnailQuality": "جودة الصور المصغرة",
+    "backupDialogTitle": "إنشاء نسخة احتياطية",
+    "backupDialogMessage": "تم حفظ النسخة الاحتياطية في:\n{{path}}",
+    "noDatabaseBackup": "لا توجد قاعدة بيانات للنسخ الاحتياطي",
+    "aboutDialog": "الإصدار 1.0.0\n\nخزنة مشفرة وآمنة لحياتك الرقمية.\n\nمبنية باستخدام Expo و React Native.",
+    "licensesDialog": "يستخدم هذا التطبيق برمجيات مفتوحة المصدر:\n\n• Expo\n• React Native\n• SQLite\n• حزم مختلفة برخصة MIT",
+    "autoLockDialogTitle": "القفل التلقائي",
+    "autoLockDialogMessage": "اختر وقت القفل التلقائي للخزائن",
+    "biometricAuthPrompt": "تحقق من هويتك لتفعيل البصمة",
     "low": "منخفضة",
     "medium": "متوسطة",
     "high": "عالية"
@@ -216,6 +261,12 @@
     "importFailed": "فشل الاستيراد",
     "backupFailed": "فشل إنشاء النسخة الاحتياطية",
     "restoreFailed": "فشل استعادة النسخة الاحتياطية"
+  },
+  "activityLog": {
+    "title": "سجل النشاطات",
+    "empty": "لا توجد نشاطات بعد",
+    "clear": "مسح السجل",
+    "clearConfirm": "هل تريد مسح سجل النشاطات؟"
   },
   "notifications": {
     "title": "الإشعارات",

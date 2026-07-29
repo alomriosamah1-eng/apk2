@@ -12,9 +12,16 @@ export interface LogEntry {
   data?: Record<string, unknown>;
 }
 
+interface LogOptions {
+  data?: Record<string, unknown>;
+  error?: Error;
+}
+
 export interface LoggerTransport {
   log(entry: LogEntry): void;
 }
+
+/* eslint-disable no-console */
 
 class ConsoleTransport implements LoggerTransport {
   log(entry: LogEntry): void {
@@ -35,10 +42,12 @@ class ConsoleTransport implements LoggerTransport {
           break;
       }
     } catch {
-      // swallow console errors in production
+      /* noop */
     }
   }
 }
+
+/* eslint-enable no-console */
 
 export class Logger {
   private level: LogLevel = 'debug';
@@ -52,13 +61,14 @@ export class Logger {
     this.transports.push(transport);
   }
 
-  private log(level: LogLevel, message: string, data?: Record<string, unknown>, error?: Error): void {
+  private write(level: LogLevel, message: string, options?: LogOptions): void {
     if (LOG_PRIORITY[level] < LOG_PRIORITY[this.level]) return;
 
     const entry: LogEntry = {
       level, message,
       timestamp: new Date().toISOString(),
-      data, error,
+      data: options?.data,
+      error: options?.error,
     };
 
     for (const transport of this.transports) {
@@ -66,11 +76,11 @@ export class Logger {
     }
   }
 
-  debug(message: string, data?: Record<string, unknown>): void { this.log('debug', message, data); }
-  info(message: string, data?: Record<string, unknown>): void { this.log('info', message, data); }
-  warn(message: string, data?: Record<string, unknown>): void { this.log('warn', message, data); }
-  error(message: string, error?: Error, data?: Record<string, unknown>): void { this.log('error', message, data, error); }
-  fatal(message: string, error?: Error, data?: Record<string, unknown>): void { this.log('fatal', message, data, error); }
+  debug(message: string, data?: Record<string, unknown>): void { this.write('debug', message, { data }); }
+  info(message: string, data?: Record<string, unknown>): void { this.write('info', message, { data }); }
+  warn(message: string, data?: Record<string, unknown>): void { this.write('warn', message, { data }); }
+  error(message: string, error?: Error, data?: Record<string, unknown>): void { this.write('error', message, { error, data }); }
+  fatal(message: string, error?: Error, data?: Record<string, unknown>): void { this.write('fatal', message, { error, data }); }
 }
 
 export const logger = new Logger();

@@ -1,4 +1,5 @@
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
@@ -15,10 +16,12 @@ interface SearchBarProps {
 function SearchBarComponent({
   value,
   onChangeText,
-  placeholder = 'Search...',
+  placeholder: _placeholder,
   onClear,
 }: SearchBarProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+  const placeholder = _placeholder ?? t('common.search');
 
   const handleClear = useCallback(() => {
     onClear?.();
@@ -37,7 +40,7 @@ function SearchBarComponent({
               onPress={handleClear}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityRole="button"
-              accessibilityLabel="Clear search"
+              accessibilityLabel={t('common.search')}
             >
               <Icon name="close-circle" size={20} color={colors.onSurfaceVariant} />
             </TouchableOpacity>

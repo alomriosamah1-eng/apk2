@@ -15,7 +15,7 @@ export const APP_CONFIG = {
 
   /** Security and encryption configuration. */
   security: {
-    pbkdf2Iterations: 600000,
+    pbkdf2Iterations: 10000,
     saltLength: 32,
     keyLength: 32,
     ivLength: 12,

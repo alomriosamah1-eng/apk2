@@ -1,4 +1,5 @@
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
@@ -7,17 +8,17 @@ import { Typography } from '@ui/components/atoms/Typography';
 import { Button } from '@ui/components/atoms/Button';
 import { Icon } from '@ui/components/atoms/Icon';
 import { useBiometrics } from '@ui/hooks/useBiometrics';
-import { AuthenticationType } from 'expo-local-authentication';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 
 function BiometricSetupScreenContent() {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const { authenticate, isAvailable, biometryType } = useBiometrics();
 
   const handleEnable = useCallback(async () => {
-    const success = await authenticate('تفعيل فتح الخزنة بالبصمة');
+    const success = await authenticate(t('settings.biometricAuthPrompt'));
     if (success) {
       const storage = new SecureStorageSource();
       await storage.set(BIOMETRIC_ENABLED_KEY, 'true');
@@ -29,8 +30,8 @@ function BiometricSetupScreenContent() {
     router.replace('/(app)/(tabs)/vault');
   }, []);
 
-  const biometricName = biometryType === AuthenticationType.FINGERPRINT ? 'البصمة' : 'الوجه';
-  const biometricIcon = biometryType === AuthenticationType.FINGERPRINT ? 'fingerprint' : 'face-recognition';
+  const biometricName = biometryType === 'fingerprint' ? t('auth.biometric') : t('auth.faceId');
+  const biometricIcon = biometryType === 'fingerprint' ? 'fingerprint' : 'face-recognition';
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -39,17 +40,17 @@ function BiometricSetupScreenContent() {
           <View style={[styles.iconContainer, { backgroundColor: colors.primaryContainer }]}>
             <Icon name={biometricIcon} size={64} color={colors.primary} />
           </View>
-          <Typography variant="headlineMedium" style={styles.title}>تفعيل {biometricName}</Typography>
+          <Typography variant="headlineMedium" style={styles.title}>{t('auth.enableBiometric', { biometricType: biometricName })}</Typography>
           <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.description}>
-            استخدم {biometricName === 'البصمة' ? 'بصمتك' : 'وجهك'} لفتح الخزنة بسرعة دون إدخال كلمة المرور
+            {t('auth.biometricSetupDesc')}
           </Typography>
         </View>
 
         <View style={styles.actions}>
           {isAvailable && (
-            <Button title={`تفعيل ${biometricName}`} onPress={handleEnable} variant="primary" fullWidth size="lg" />
+            <Button title={t('auth.enableBiometric', { biometricType: biometricName })} onPress={handleEnable} variant="primary" fullWidth size="lg" />
           )}
-          <Button title="تخطي الآن" onPress={handleSkip} variant="ghost" fullWidth />
+          <Button title={t('auth.skipBiometric')} onPress={handleSkip} variant="ghost" fullWidth />
         </View>
       </View>
     </TouchableWithoutFeedback>

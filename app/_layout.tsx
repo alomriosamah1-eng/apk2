@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold } from '@expo-google-fonts/cairo';
 import { ThemeProvider, useTheme } from '@ui/providers/ThemeProvider';
+import { SessionProvider } from '@ui/providers/SessionProvider';
 import '@core/i18n';
 import { registerDependencies } from '@core/di/register';
 import { DatabaseService } from '@data/database/DatabaseService';
@@ -91,7 +92,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <RootLayoutInner />
+          <SessionProvider>
+            <RootLayoutInner />
+          </SessionProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

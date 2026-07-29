@@ -1,11 +1,26 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Platform } from 'react-native';
+
+export type BiometricType = 'face' | 'fingerprint' | 'iris' | null;
 
 interface BiometricsState {
   isAvailable: boolean;
   isEnrolled: boolean;
-  biometryType: LocalAuthentication.AuthenticationType | null;
+  biometryType: BiometricType;
+}
+
+function mapAuthType(type: LocalAuthentication.AuthenticationType): BiometricType {
+  switch (type) {
+    case LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION:
+      return 'face';
+    case LocalAuthentication.AuthenticationType.FINGERPRINT:
+      return 'fingerprint';
+    case LocalAuthentication.AuthenticationType.IRIS:
+      return 'iris';
+    default:
+      return null;
+  }
 }
 
 export function useBiometrics() {
@@ -25,12 +40,20 @@ export function useBiometrics() {
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
     const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
 
+    const preferred = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+      ? LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
+      : supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)
+        ? LocalAuthentication.AuthenticationType.IRIS
+        : supportedTypes[0] ?? null;
+
     setState({
-      isAvailable: hasHardware && isEnrolled,
+      isAvailable: hasHardware && isEnrolled && preferred !== null,
       isEnrolled,
-      biometryType: supportedTypes[0] ?? null,
+      biometryType: preferred ? mapAuthType(preferred) : null,
     });
   }, []);
+
+  useEffect(() => { checkBiometrics(); }, [checkBiometrics]);
 
   const authenticate = useCallback(async (
     promptMessage: string = 'Authenticate to access Khaznati',

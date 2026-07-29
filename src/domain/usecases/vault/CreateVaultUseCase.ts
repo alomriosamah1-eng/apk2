@@ -4,15 +4,21 @@ import { Result, failure, ValidationError } from '@core/errors';
 import { generateId, now, generateSalt, hashPin } from '@core/utils';
 import { validateVaultName, validatePin } from '@core/validators';
 import { VaultType } from '@core/constants';
+import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
 
 export interface CreateVaultInput {
   name: string;
   type: VaultType;
   pin: string;
+  icon?: string;
+  color?: string;
 }
 
 export class CreateVaultUseCase {
-  constructor(private vaultRepository: IVaultRepository) {}
+  constructor(
+    private vaultRepository: IVaultRepository,
+    private biometricUnlockUseCase?: BiometricUnlockUseCase,
+  ) {}
 
   async execute(input: CreateVaultInput): Promise<Result<Vault>> {
     const nameValidation = validateVaultName(input.name);
@@ -33,8 +39,8 @@ export class CreateVaultUseCase {
       id: generateId(),
       name: input.name.trim(),
       type: input.type,
-      icon: 'shield-lock',
-      color: '#6C63FF',
+      icon: input.icon ?? 'shield-lock',
+      color: input.color ?? '#6C63FF',
       createdAt: timestamp,
       updatedAt: timestamp,
       lastAccessedAt: timestamp,
@@ -46,6 +52,11 @@ export class CreateVaultUseCase {
       backupVersion: 0,
     };
 
-    return this.vaultRepository.create(vault);
+    const result = await this.vaultRepository.create(vault);
+    if (result.success && this.biometricUnlockUseCase) {
+      await this.biometricUnlockUseCase.storeBiometricPin(vault.id, input.pin);
+    }
+
+    return result;
   }
 }

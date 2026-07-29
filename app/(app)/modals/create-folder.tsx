@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Paths, Directory } from 'expo-file-system';
@@ -11,6 +12,7 @@ import { spacing } from '@core/theme';
 
 export default function CreateFolderModal() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { vaultId } = useLocalSearchParams<{ vaultId: string }>();
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -41,13 +43,13 @@ export default function CreateFolderModal() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={{ flex: 1 }}>
-        <ScreenLayout title="New Folder" showBack onBack={() => router.back()}>
+        <ScreenLayout title={t('files.addFolder')} showBack onBack={() => router.back()}>
           <KeyboardAvoidingView behavior={Platform.OS === 'android' ? undefined : 'padding'} style={styles.container}>
             <Input
-              label="Folder Name"
+              label={t('files.folderName')}
               value={name}
               onChangeText={(t) => { setName(t); setError(null); }}
-              placeholder="Enter folder name"
+              placeholder={t('files.folderNamePlaceholder')}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={handleCreate}
@@ -57,7 +59,7 @@ export default function CreateFolderModal() {
                 {error}
               </Typography>
             )}
-            <Button title={creating ? 'Creating...' : 'Create'} onPress={handleCreate} variant="primary" fullWidth disabled={!name.trim() || creating} />
+            <Button title={creating ? t('common.loading') : t('common.save')} onPress={handleCreate} variant="primary" fullWidth disabled={!name.trim() || creating} />
           </KeyboardAvoidingView>
         </ScreenLayout>
       </View>

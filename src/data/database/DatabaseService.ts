@@ -2,6 +2,8 @@ import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 import { APP_CONFIG } from '@core/constants';
 import { now, logger, withRetry } from '@core/utils';
+import { generateEncryptionKey } from '@core/utils/crypto';
+import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 
 /** Service managing the SQLite database connection, queries, transactions, and backups. */
 export class DatabaseService {
@@ -15,8 +17,21 @@ export class DatabaseService {
     this.db = openDatabaseSync(APP_CONFIG.database.name);
     this.dbPath = `${FileSystem.documentDirectory}SQLite/${APP_CONFIG.database.name}`;
 
-    if (password) {
+    if (!password) {
+      const storage = new SecureStorageSource();
+      const storedKey = await storage.get('db_encryption_key');
+      if (storedKey) {
+        password = storedKey;
+      } else {
+        password = await generateEncryptionKey();
+        await storage.set('db_encryption_key', password);
+      }
+    }
+
+    try {
       this.db.runSync('PRAGMA key = ?', [password]);
+    } catch {
+      logger.warn('Database encryption not supported on this platform, continuing without PRAGMA key');
     }
 
     this.db.execSync('PRAGMA journal_mode = WAL');

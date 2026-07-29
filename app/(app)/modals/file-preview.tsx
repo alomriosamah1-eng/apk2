@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { File } from 'expo-file-system';
@@ -15,6 +16,7 @@ const TEXT_EXTENSIONS = ['.txt', '.md', '.json', '.xml', '.html', '.csv', '.log'
 
 export default function FilePreviewModal() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { fileName, uri } = useLocalSearchParams<{ fileName: string; uri: string; type: string }>();
   const ext = fileName ? `.${fileName.split('.').pop()?.toLowerCase()}` : '';
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext.replace('.', ''));
@@ -28,14 +30,14 @@ export default function FilePreviewModal() {
   useEffect(() => {
     if (!uri) {
       setLoading(false);
-      setError('No file specified');
+      setError(t('errors.itemNotFound'));
       return;
     }
     (async () => {
       try {
         const file = new File(uri);
         if (!file.exists) {
-          setError('File not found');
+          setError(t('errors.itemNotFound'));
           setLoading(false);
           return;
         }
@@ -58,17 +60,17 @@ export default function FilePreviewModal() {
 
   if (!uri) {
     return (
-      <ScreenLayout title="Preview" showBack onBack={() => router.back()}>
+        <ScreenLayout title={t('files.preview')} showBack onBack={() => router.back()}>
         <View style={styles.center}>
           <Icon name="file-question-outline" size={64} color={colors.onSurfaceVariant} />
-          <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>No file selected</Typography>
+          <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>{t('files.noFileSelected')}</Typography>
         </View>
       </ScreenLayout>
     );
   }
 
   if (loading) {
-    return <Loading fullScreen message="Loading preview..." />;
+    return <Loading fullScreen message={t('common.loading')} />;
   }
 
   if (error && !isImage && !isVideo) {
@@ -76,14 +78,14 @@ export default function FilePreviewModal() {
   }
 
   return (
-    <ScreenLayout title={fileName || 'Preview'} showBack onBack={() => router.back()}>
+    <ScreenLayout title={fileName || t('files.preview')} showBack onBack={() => router.back()}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {isImage ? (
           <Image source={{ uri }} style={styles.image} contentFit="contain" accessibilityLabel={fileName} />
         ) : isVideo ? (
           <View style={[styles.videoPlaceholder, { backgroundColor: colors.surfaceVariant }]}>
             <Icon name="video-outline" size={64} color={colors.onSurfaceVariant} />
-            <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>Video Player</Typography>
+            <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>{t('files.videoPlayer')}</Typography>
             <Typography variant="bodySmall" color={colors.onSurfaceVariant}>{fileName}</Typography>
           </View>
         ) : isText && textContent !== null ? (
@@ -96,7 +98,7 @@ export default function FilePreviewModal() {
           <View style={styles.center}>
             <Icon name="file-outline" size={64} color={colors.onSurfaceVariant} />
             <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>
-              {ext ? `${ext.toUpperCase()} File` : 'File'}
+                {ext ? t('files.fileType', { ext: ext.toUpperCase() }) : 'File'}
             </Typography>
             {fileSize && <Typography variant="bodySmall" color={colors.onSurfaceVariant}>{fileSize}</Typography>}
             {error && <Typography variant="bodySmall" color={colors.error} style={styles.text}>{error}</Typography>}

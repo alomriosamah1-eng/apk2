@@ -1,4 +1,5 @@
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { Typography } from './Typography';
@@ -11,8 +12,10 @@ interface ErrorViewProps {
   onRetry?: () => void;
 }
 
-function ErrorViewComponent({ message = 'Something went wrong', onRetry }: ErrorViewProps) {
+function ErrorViewComponent({ message: _message, onRetry }: ErrorViewProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+  const message = _message ?? t('errors.general');
 
   const handleRetry = useCallback(() => {
     onRetry?.();
@@ -29,7 +32,7 @@ function ErrorViewComponent({ message = 'Something went wrong', onRetry }: Error
         {message}
       </Typography>
       {onRetry && (
-        <Button title="Try Again" onPress={handleRetry} variant="ghost" />
+        <Button title={t('common.retry')} onPress={handleRetry} variant="ghost" />
       )}
     </View>
   );
