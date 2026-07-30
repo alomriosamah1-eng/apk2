@@ -421,7 +421,7 @@ npx jest --passWithNoTests          # MUST PASS
 ```
 
 **التراجع:** `git checkout -- src/core/utils/crypto.ts`
-**[ ]**
+**[✅]**
 
 ---
 
@@ -482,7 +482,7 @@ const hash2 = await hashPin('1234', 'ab' + 'cd');
 **التحقق:** `grep -r "deriveKeyFromPin" src/ app/` — يجب أن لا يظهر شيء
 
 **التراجع:** `git checkout -- src/core/utils/crypto.ts`
-**[ ]**
+**[✅]**
 
 ---
 
@@ -2227,13 +2227,13 @@ echo "=== EXPO DOCTOR ===" && npx expo-doctor 2>&1 | tail -3
 | S-00-01 | Backup المشروع | [ ] |
 | S-00-02 | تثبيت المكتبات | [ ] |
 | S-00-03 | CI --legacy-peer-deps | [ ] |
-| S-01-01 | crypto.ts AES-256-GCM + tag | [ ] |
-| S-01-02 | hashPin PBKDF2 100k | [ ] |
-| S-01-03 | إزالة deriveKeyFromPin المكرر | [ ] |
-| S-01-04 | إزالة AuthenticateUseCase | [ ] |
-| S-01-05 | إزالة validation.ts | [ ] |
-| S-01-06 | إزالة CircuitBreaker | [ ] |
-| S-01-07 | إزالة NeuButton/Card/Input | [ ] |
+| S-01-01 | crypto.ts AES-256-GCM + tag | [✅] |
+| S-01-02 | hashPin PBKDF2 100k | [✅] |
+| S-01-03 | إزالة deriveKeyFromPin المكرر | [✅] |
+| S-01-04 | إزالة AuthenticateUseCase | [✅] |
+| S-01-05 | إزالة validation.ts | [✅] |
+| S-01-06 | إزالة CircuitBreaker | [✅] |
+| S-01-07 | إزالة NeuButton/Card/Input | [✅] |
 | S-01-08 | biometryType تفضيل الوجه | [ ] |
 | S-01-09 | إصلاح Domain→Data dependency | [ ] |
 | S-01-10 | إزالة Service Locator | [ ] |

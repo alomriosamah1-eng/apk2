@@ -17,7 +17,6 @@ import { UnlockVaultUseCase } from '@domain/usecases/vault/UnlockVaultUseCase';
 import { AddItemUseCase } from '@domain/usecases/item/AddItemUseCase';
 import { DeleteItemUseCase } from '@domain/usecases/item/DeleteItemUseCase';
 import { SearchItemsUseCase } from '@domain/usecases/item/SearchItemsUseCase';
-import { AuthenticateUseCase } from '@domain/usecases/auth/AuthenticateUseCase';
 import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
 import { up as migration001Up, down as migration001Down } from '@data/database/migrations/001_initial';
 import { up as migration002Up, down as migration002Down } from '@data/database/migrations/002_indexes';
@@ -89,10 +88,6 @@ export function registerDependencies(): void {
   DIContainer.registerSingleton('SearchItemsUseCase', () =>
     new SearchItemsUseCase(DIContainer.resolve<ItemRepositoryImpl>('ItemRepository')),
   );
-  DIContainer.registerSingleton('AuthenticateUseCase', () =>
-    new AuthenticateUseCase(),
-  );
-
   DIContainer.registerSingleton('BiometricUnlockUseCase', () =>
     new BiometricUnlockUseCase(
       DIContainer.resolve<VaultRepositoryImpl>('VaultRepository'),

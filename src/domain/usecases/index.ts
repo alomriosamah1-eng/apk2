@@ -8,5 +8,4 @@ export { AddItemUseCase } from './item/AddItemUseCase';
 export type { AddItemInput } from './item/AddItemUseCase';
 export { DeleteItemUseCase } from './item/DeleteItemUseCase';
 export { SearchItemsUseCase } from './item/SearchItemsUseCase';
-export { AuthenticateUseCase } from './auth/AuthenticateUseCase';
-export type { AuthResult } from './auth/AuthenticateUseCase';
+
