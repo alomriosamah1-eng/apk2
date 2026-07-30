@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="logoGrad" x1="0" y1="0" x2="120" y2="120">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="28" fill="url(#logoGrad)"/>
+  <rect x="4" y="4" width="112" height="112" rx="24" fill="url(#logoGrad)" opacity="0.15"/>
+  <!-- Book -->
+  <path d="M38 38h16v44H38a6 6 0 01-6-6V44a6 6 0 016-6z" fill="#fff" opacity="0.9"/>
+  <path d="M54 38h16v44H54a6 6 0 01-6-6V44a6 6 0 016-6z" fill="#fff" opacity="0.6"/>
+  <!-- Open book line -->
+  <path d="M46 38v44M60 38v44" stroke="url(#logoGrad)" stroke-width="1.5" opacity="0.4"/>
+  <!-- Graduation cap -->
+  <path d="M60 32l-26 14 26 14 26-14-26-14z" fill="#fff" opacity="0.95" transform="translate(0 -2)"/>
+  <path d="M60 46l20-10.8V50c0 4.4-8.9 8-20 8s-20-3.6-20-8V35.2L60 46z" fill="#fff" opacity="0.95" transform="translate(0 -2)"/>
+  <!-- Tassel -->
+  <path d="M60 32l-2 12" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" transform="translate(0 -2)"/>
+  <circle cx="58" cy="44" r="2" fill="#FBBF24" transform="translate(0 -2)"/>
+  <!-- Sparkle dots -->
+  <circle cx="82" cy="36" r="2.5" fill="#fff" opacity="0.7"/>
+  <circle cx="88" cy="48" r="1.5" fill="#fff" opacity="0.5"/>
+  <circle cx="34" cy="70" r="1.5" fill="#fff" opacity="0.4"/>
+</svg>

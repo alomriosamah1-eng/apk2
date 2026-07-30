@@ -221,8 +221,8 @@ function SettingsScreenContent() {
   }, []);
 
   const handleAbout = useCallback(() => {
-    Alert.alert(t('app.name'), t('settings.aboutDialog'));
-  }, [t]);
+    router.push('/(app)/modals/about');
+  }, []);
 
   const handleLicenses = useCallback(() => {
     Alert.alert(t('settings.licenses'), t('settings.licensesDialog'));
