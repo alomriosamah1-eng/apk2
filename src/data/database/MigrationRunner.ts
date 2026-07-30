@@ -27,7 +27,12 @@ export class MigrationRunner {
       )
     `);
 
-    const currentVersion = await db.getVersion();
+    // Determine effective current version: max of PRAGMA user_version and _migrations table
+    const pragmaVersion = await db.getVersion();
+    const rows = await db.query<{ version: number }>('SELECT COALESCE(MAX(version), 0) as version FROM _migrations');
+    const appliedMax = rows[0]?.version ?? 0;
+    const currentVersion = Math.max(pragmaVersion, appliedMax);
+
     const maxVersion = targetVersion ?? this.migrations.length;
 
     this.migrations.sort((a, b) => a.version - b.version);
@@ -37,7 +42,7 @@ export class MigrationRunner {
         if (migration.version > currentVersion && migration.version <= maxVersion) {
           await migration.up(db);
           await db.executeSql(
-            'INSERT INTO _migrations (version, name) VALUES (?, ?)',
+            'INSERT OR IGNORE INTO _migrations (version, name) VALUES (?, ?)',
             [migration.version, migration.name],
           );
           await db.setVersion(migration.version);

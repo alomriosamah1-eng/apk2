@@ -27,7 +27,8 @@
     "disabled": "Disabled",
     "on": "On",
     "off": "Off",
-    "add": "Add"
+    "add": "Add",
+    "share": "Share"
   },
   "auth": {
     "welcome": "Welcome to Khaznati",
@@ -116,7 +117,10 @@
     "size": "Size",
     "type": "Type",
     "dateModified": "Date Modified",
-    "dateCreated": "Date Created"
+    "dateCreated": "Date Created",
+    "export": "Export to device",
+    "exportSuccess": "Files exported successfully",
+    "deleteConfirm": "Delete {{name}}?"
   },
   "media": {
     "title": "Media",
@@ -263,7 +267,8 @@
     "exportFailed": "Export failed",
     "importFailed": "Import failed",
     "backupFailed": "Backup creation failed",
-    "restoreFailed": "Backup restoration failed"
+    "restoreFailed": "Backup restoration failed",
+    "permission": "Permission required"
   },
   "activityLog": {
     "title": "Activity Log",

@@ -27,7 +27,8 @@
     "disabled": "معطل",
     "on": "تشغيل",
     "off": "إيقاف",
-    "add": "إضافة"
+    "add": "إضافة",
+    "share": "مشاركة"
   },
   "auth": {
     "welcome": "مرحباً بك في خزنتي",
@@ -113,7 +114,10 @@
     "size": "الحجم",
     "type": "النوع",
     "dateModified": "تاريخ التعديل",
-    "dateCreated": "تاريخ الإنشاء"
+    "dateCreated": "تاريخ الإنشاء",
+    "export": "تصدير إلى الجهاز",
+    "exportSuccess": "تم تصدير الملفات بنجاح",
+    "deleteConfirm": "حذف {{name}}؟"
   },
   "media": {
     "title": "الوسائط",
@@ -260,7 +264,8 @@
     "exportFailed": "فشل التصدير",
     "importFailed": "فشل الاستيراد",
     "backupFailed": "فشل إنشاء النسخة الاحتياطية",
-    "restoreFailed": "فشل استعادة النسخة الاحتياطية"
+    "restoreFailed": "فشل استعادة النسخة الاحتياطية",
+    "permission": "الإذن مطلوب"
   },
   "activityLog": {
     "title": "سجل النشاطات",

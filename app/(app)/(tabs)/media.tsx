@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, RefreshControl, Dimensions, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { View, StyleSheet, RefreshControl, Dimensions, ScrollView, TouchableOpacity, Alert, Share } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
@@ -13,10 +13,15 @@ import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
+import { SearchBar } from '@ui/components/molecules/SearchBar';
+import { SelectionBar } from '@ui/components/organisms/SelectionBar';
 import { useTranslation } from 'react-i18next';
 import { encryptFile, decryptFile, generateEncryptionKey } from '@core/utils/crypto';
 import { DIContainer } from '@core/di/container';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
+import { IItemRepository } from '@domain/repositories/IItemRepository';
+import { ItemType } from '@core/constants';
+import { generateId } from '@core/utils';
 
 const NUM_COLUMNS = 3;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -50,9 +55,16 @@ export default function MediaScreen() {
   const { vaultId } = useLocalSearchParams<{ vaultId: string }>();
   const vid = vaultId || 'default';
   const [media, setMedia] = useState<MediaItem[]>([]);
+
+  const itemRepo = useMemo(
+    () => DIContainer.resolve<IItemRepository>('ItemRepository'),
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const loadMedia = useCallback(async () => {
     try {
@@ -89,6 +101,40 @@ export default function MediaScreen() {
     loadMedia();
   }, [loadMedia]);
 
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleBatchDelete = useCallback(() => {
+    Alert.alert(t('common.delete'), t('media.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          selectedIds.forEach((id) => {
+            const item = media.find((m) => m.id === id);
+            if (item) new File(item.encryptedPath).delete();
+          });
+          clearSelection();
+          loadMedia();
+        },
+      },
+    ]);
+  }, [selectedIds, media, clearSelection, loadMedia, t]);
+
+  const handleBatchShare = useCallback(async () => {
+    const selected = media.filter((m) => selectedIds.has(m.id));
+    const names = selected.map((m) => m.name).join(', ');
+    await Share.share({ message: names });
+  }, [selectedIds, media]);
+
   const handleImport = useCallback(async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -113,6 +159,25 @@ export default function MediaScreen() {
       const encFileName = `${Date.now()}.${ext}.enc`;
       const encFile = new File(encDir, encFileName);
       await encFile.write(encryptedBase64);
+
+      await itemRepo.create({
+        id: generateId(),
+        vaultId: vid,
+        parentId: null,
+        name: asset.fileName || 'photo.jpg',
+        type: ItemType.IMAGE,
+        mimeType: asset.mimeType || 'image/jpeg',
+        size: asset.fileSize || 0,
+        encryptedPath: encFile.uri,
+        encryptedData: null,
+        thumbnailPath: null,
+        metadata: null,
+        isFavorite: false,
+        isDeleted: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        deletedAt: null,
+      });
 
       loadMedia();
     } catch (err) {
@@ -159,22 +224,11 @@ export default function MediaScreen() {
     }
   }, [vid, t]);
 
-  const handleDelete = useCallback((item: MediaItem) => {
-    Alert.alert(t('common.delete'), t('media.deleteConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          const encFile = new File(item.encryptedPath);
-          encFile.delete();
-          loadMedia();
-        },
-      },
-    ]);
-  }, [loadMedia, t]);
+  const filteredMedia = search
+    ? media.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
+    : media;
 
-  const selectedItem = media.find((m) => m.decryptedUri);
+  const selectedItem = filteredMedia.find((m) => m.decryptedUri);
 
   if (loading && media.length === 0) {
     return <Loading fullScreen message={t('common.loading')} />;
@@ -199,41 +253,57 @@ export default function MediaScreen() {
           </View>
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.grid}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {media.length === 0 ? (
-            <EmptyState
-              icon="image-multiple-outline"
-              title={t('media.empty')}
-              description={t('media.emptyDesc')}
-              actionLabel={t('files.addFile')}
-              onAction={handleImport}
-            />
-          ) : (
-            <View style={styles.gridRow}>
-              {media.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => handleView(item)}
-                  onLongPress={() => handleDelete(item)}
-                  style={styles.mediaItem}
-                >
-                  <View style={[styles.thumbnail, { backgroundColor: colors.surfaceVariant }]}>
-                    <Icon name="image" size={28} color={colors.onSurfaceVariant} />
-                    {index < 3 && (
-                      <Typography variant="caption" color={colors.onSurfaceVariant} style={styles.fileName} numberOfLines={1}>
-                        {item.name}
-                      </Typography>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </ScrollView>
+        <View style={styles.flexOne}>
+          <SearchBar value={search} onChangeText={setSearch} placeholder={t('media.search') || 'Search'} onClear={() => setSearch('')} />
+          <SelectionBar
+            selectedCount={selectedIds.size}
+            onClearSelection={clearSelection}
+            actions={[
+              { icon: 'share-variant', label: t('common.share'), onPress: handleBatchShare },
+              { icon: 'delete', label: t('common.delete'), onPress: handleBatchDelete, destructive: true },
+            ]}
+          />
+          <ScrollView
+            contentContainerStyle={styles.grid}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+            showsVerticalScrollIndicator={false}
+          >
+            {filteredMedia.length === 0 ? (
+              <EmptyState
+                icon="image-multiple-outline"
+                title={search ? t('common.noResults') : t('media.empty')}
+                description={search ? t('common.noResults') : t('media.emptyDesc')}
+                actionLabel={search ? undefined : t('files.addFile')}
+                onAction={search ? undefined : handleImport}
+              />
+            ) : (
+              <View style={styles.gridRow}>
+                {filteredMedia.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => handleView(item)}
+                    onLongPress={() => toggleSelection(item.id)}
+                    style={styles.mediaItem}
+                  >
+                    <View style={[styles.thumbnail, { backgroundColor: colors.surfaceVariant }]}>
+                      {selectedIds.has(item.id) && (
+                        <View style={[styles.checkOverlay, { backgroundColor: colors.primary + '33' }]}>
+                          <Icon name="check-circle" size={24} color={colors.primary} />
+                        </View>
+                      )}
+                      <Icon name="image" size={28} color={colors.onSurfaceVariant} />
+                      {index < 3 && (
+                        <Typography variant="caption" color={colors.onSurfaceVariant} style={styles.fileName} numberOfLines={1}>
+                          {item.name}
+                        </Typography>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
       )}
       {!selectedItem && (
         <TouchableOpacity
@@ -251,6 +321,7 @@ export default function MediaScreen() {
 }
 
 const styles = StyleSheet.create({
+  flexOne: { flex: 1 },
   grid: {
     padding: spacing.lg,
     paddingBottom: spacing.xxxl,
@@ -271,6 +342,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   fileName: {
     marginTop: spacing.xs,

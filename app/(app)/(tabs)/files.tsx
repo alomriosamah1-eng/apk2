@@ -1,19 +1,25 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Alert, TextInput as RNTextInput } from 'react-native';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { View, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Alert, TextInput as RNTextInput, Share } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Paths, File, Directory } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
 import { EmptyState } from '@ui/components/atoms/EmptyState';
 import { SearchBar } from '@ui/components/molecules/SearchBar';
+import { SelectionBar } from '@ui/components/organisms/SelectionBar';
 import { FloatingButton } from '@ui/components/molecules/FloatingButton';
 import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
+import { DIContainer } from '@core/di/container';
+import { IItemRepository } from '@domain/repositories/IItemRepository';
+import { ItemType } from '@core/constants';
+import { generateId } from '@core/utils';
 
 interface FileItem {
   id: string;
@@ -38,8 +44,14 @@ export default function FilesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
   const [renameText, setRenameText] = useState('');
+
+  const itemRepo = useMemo(
+    () => DIContainer.resolve<IItemRepository>('ItemRepository'),
+    [],
+  );
 
   const getVaultDir = useCallback(() => {
     return new Directory(Paths.document, 'khaznati', vaultId || 'default');
@@ -95,12 +107,80 @@ export default function FilesScreen() {
         destFile.create({ overwrite: true });
         const srcFile = new File(asset.uri);
         srcFile.copy(destFile);
+
+        await itemRepo.create({
+          id: generateId(),
+          vaultId: vaultId || 'default',
+          parentId: null,
+          name: asset.name,
+          type: ItemType.FILE,
+          mimeType: asset.mimeType || null,
+          size: asset.size || 0,
+          encryptedPath: destFile.uri,
+          encryptedData: null,
+          thumbnailPath: null,
+          metadata: null,
+          isFavorite: false,
+          isDeleted: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          deletedAt: null,
+        });
+
         loadFiles();
       }
     } catch (err) {
       setError((err as Error).message);
     }
   }, [getVaultDir, loadFiles]);
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleBatchDelete = useCallback(() => {
+    Alert.alert(t('common.delete'), t('files.deleteConfirm', { name: `${selectedIds.size} item(s)` }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          selectedIds.forEach((id) => new File(id).delete());
+          clearSelection();
+          loadFiles();
+        },
+      },
+    ]);
+  }, [selectedIds, clearSelection, loadFiles, t]);
+
+  const handleBatchShare = useCallback(async () => {
+    const names = files.filter((f) => selectedIds.has(f.id)).map((f) => f.name).join(', ');
+    await Share.share({ message: names });
+  }, [selectedIds, files]);
+
+  const handleBatchExport = useCallback(async () => {
+    const selected = files.filter((f) => selectedIds.has(f.id) && f.type === 'file');
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('common.error'), t('errors.permission'));
+      return;
+    }
+    for (const item of selected) {
+      const src = new File(item.id);
+      const tempDir = new Directory(Paths.cache, 'khaznati_export');
+      if (!tempDir.exists) tempDir.create({ intermediates: true, idempotent: true });
+      const tempFile = new File(tempDir, item.name);
+      src.copy(tempFile);
+    }
+    clearSelection();
+    Alert.alert(t('common.success'), t('files.exportSuccess'));
+  }, [selectedIds, files, clearSelection, t]);
 
   const handleFilePress = useCallback((item: FileItem) => {
     router.push({ pathname: '/(app)/modals/file-preview', params: { fileName: item.name, uri: item.id } });
@@ -185,57 +265,86 @@ export default function FilesScreen() {
 
   return (
     <ScreenLayout title={t('files.title')} subtitle={t('vault.itemsCount', { count: files.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
-      <SearchBar value={search} onChangeText={setSearch} placeholder={t('files.search')} onClear={() => setSearch('')} />
-      <ScrollView
-        style={styles.listContainer}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-      >
-        {filteredFiles.length === 0 ? (
-          <EmptyState
-            icon="folder-open-outline"
-            title={search ? t('common.noResults') : t('files.empty')}
-            description={search ? t('common.noResults') : t('files.emptyDesc')}
-            actionLabel={search ? undefined : t('files.addFile')}
-            onAction={search ? undefined : handleImport}
-          />
-        ) : (
-          filteredFiles.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => handleFilePress(item)}
-              onLongPress={() => {
-                Alert.alert(item.name, undefined, [
-                  { text: t('common.rename'), onPress: () => handleRenameFile(item) },
-                  { text: t('common.delete'), style: 'destructive', onPress: () => handleDeleteFile(item) },
-                  { text: t('common.cancel'), style: 'cancel' },
-                ]);
-              }}
-              style={[styles.fileRow, { borderBottomColor: colors.outlineVariant }]}
-            >
-              <Icon
-                name={item.type === 'folder' ? 'folder' : 'file-outline'}
-                size={24}
-                color={item.type === 'folder' ? '#FFB74D' : colors.onSurface}
-              />
-              <View style={styles.fileInfo}>
-                <Typography variant="bodyMedium" numberOfLines={1}>{item.name}</Typography>
-                {item.type === 'file' && item.size !== undefined && (
-                  <Typography variant="bodySmall" color={colors.onSurfaceVariant}>
-                    {formatSize(item.size)}
-                  </Typography>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-      <FloatingButton icon="plus" onPress={handleImport} accessibilityLabel={t('files.addFile')} />
+      <View style={styles.flexOne}>
+        <SearchBar value={search} onChangeText={setSearch} placeholder={t('files.search')} onClear={() => setSearch('')} />
+        <SelectionBar
+          selectedCount={selectedIds.size}
+          onClearSelection={clearSelection}
+          actions={[
+            { icon: 'share-variant', label: t('common.share'), onPress: handleBatchShare },
+            { icon: 'export', label: t('files.export'), onPress: handleBatchExport },
+            { icon: 'delete', label: t('common.delete'), onPress: handleBatchDelete, destructive: true },
+          ]}
+        />
+        <ScrollView
+          style={styles.listContainer}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        >
+          {filteredFiles.length === 0 ? (
+            <EmptyState
+              icon="folder-open-outline"
+              title={search ? t('common.noResults') : t('files.empty')}
+              description={search ? t('common.noResults') : t('files.emptyDesc')}
+              actionLabel={search ? undefined : t('files.addFile')}
+              onAction={search ? undefined : handleImport}
+            />
+          ) : (
+            filteredFiles.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => {
+                  if (selectedIds.size > 0) {
+                    toggleSelection(item.id);
+                  } else {
+                    handleFilePress(item);
+                  }
+                }}
+                onLongPress={() => {
+                  if (selectedIds.size > 0) {
+                    toggleSelection(item.id);
+                  } else {
+                    Alert.alert(item.name, undefined, [
+                      { text: t('common.rename'), onPress: () => handleRenameFile(item) },
+                      { text: t('common.delete'), style: 'destructive', onPress: () => handleDeleteFile(item) },
+                      { text: t('common.cancel'), style: 'cancel' },
+                    ]);
+                  }
+                }}
+                style={[styles.fileRow, { borderBottomColor: colors.outlineVariant }]}
+              >
+                <TouchableOpacity onPress={() => toggleSelection(item.id)} style={styles.checkbox} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon
+                    name={selectedIds.has(item.id) ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={22}
+                    color={selectedIds.has(item.id) ? colors.primary : colors.onSurfaceVariant}
+                  />
+                </TouchableOpacity>
+                <Icon
+                  name={item.type === 'folder' ? 'folder' : 'file-outline'}
+                  size={24}
+                  color={item.type === 'folder' ? '#FFB74D' : colors.onSurface}
+                />
+                <View style={styles.fileInfo}>
+                  <Typography variant="bodyMedium" numberOfLines={1}>{item.name}</Typography>
+                  {item.type === 'file' && item.size !== undefined && (
+                    <Typography variant="bodySmall" color={colors.onSurfaceVariant}>
+                      {formatSize(item.size)}
+                    </Typography>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+        <FloatingButton icon="plus" onPress={handleImport} accessibilityLabel={t('files.addFile')} />
+      </View>
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  flexOne: { flex: 1 },
   listContainer: {
     flex: 1,
   },
@@ -249,6 +358,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  checkbox: {
+    marginRight: spacing.sm,
   },
   fileInfo: {
     flex: 1,

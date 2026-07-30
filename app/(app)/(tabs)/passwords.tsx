@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, RefreshControl, TouchableOpacity, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
@@ -9,32 +9,25 @@ import { Typography } from '@ui/components/atoms/Typography';
 import { EmptyState } from '@ui/components/atoms/EmptyState';
 import { SearchBar } from '@ui/components/molecules/SearchBar';
 import { FloatingButton } from '@ui/components/molecules/FloatingButton';
+import { SelectionBar } from '@ui/components/organisms/SelectionBar';
 import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { Icon } from '@ui/components/atoms/Icon';
 import { Input } from '@ui/components/atoms/Input';
 import { Button } from '@ui/components/atoms/Button';
-import { useSecureStorage } from '@ui/hooks/useSecureStorage';
 import { useTranslation } from 'react-i18next';
-
-interface PasswordEntry {
-  id: string;
-  serviceName: string;
-  serviceUrl: string;
-  username: string;
-  password: string;
-  category: string;
-  notes: string;
-  createdAt: number;
-}
+import { DIContainer } from '@core/di/container';
+import { IPasswordRepository } from '@domain/repositories/IPasswordRepository';
+import { PasswordEntry } from '@domain/entities/Password';
+import { generateId } from '@core/utils';
 
 const CATEGORIES = ['social', 'email', 'finance', 'shopping', 'work', 'entertainment', 'other'];
-const STORAGE_KEY = 'khaznati_passwords';
 
 export default function PasswordsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { getItem, setItem } = useSecureStorage();
+  const { vaultId: paramsVaultId } = useLocalSearchParams<{ vaultId: string }>();
+  const vaultId = paramsVaultId || '';
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,28 +39,29 @@ export default function PasswordsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPasswords, setShowPasswords] = useState<Set<string>>(new Set());
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelecting, setIsSelecting] = useState(false);
+
+  const repo = useMemo(
+    () => DIContainer.resolve<IPasswordRepository>('PasswordRepository'),
+    [],
+  );
 
   const loadEntries = useCallback(async () => {
-    try {
-      setError(null);
-      const stored = await getItem(STORAGE_KEY);
-      setEntries(stored ? JSON.parse(stored) : []);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    setError(null);
+    const result = await repo.findByVaultId(vaultId);
+    if (result.success) {
+      setEntries(result.data);
+    } else {
+      setError(result.error.message);
     }
-  }, [getItem]);
+    setLoading(false);
+    setRefreshing(false);
+  }, [repo, vaultId]);
 
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
-
-  const saveEntries = useCallback(async (updated: PasswordEntry[]) => {
-    await setItem(STORAGE_KEY, JSON.stringify(updated));
-    setEntries(updated);
-  }, [setItem]);
 
   const generatePassword = useCallback(() => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()';
@@ -82,36 +76,102 @@ export default function PasswordsScreen() {
     if (!formData.serviceName || !formData.username || !formData.password) return;
 
     const timestamp = Date.now();
-    let updated: PasswordEntry[];
-
+    let result;
     if (editingId) {
-      updated = entries.map((e) => (e.id === editingId ? { ...e, ...formData, createdAt: e.createdAt } : e));
+      const existing = entries.find((e) => e.id === editingId);
+      if (existing) {
+        result = await repo.update({
+          ...existing,
+          serviceName: formData.serviceName,
+          serviceUrl: formData.serviceUrl || null,
+          username: formData.username || null,
+          encryptedPassword: formData.password,
+          category: selectedCategory || null,
+          notes: formData.notes || null,
+          updatedAt: timestamp,
+        });
+      }
     } else {
-      updated = [{ id: timestamp.toString(), ...formData, category: selectedCategory, createdAt: timestamp }, ...entries];
+      result = await repo.create({
+        id: generateId(),
+        vaultId,
+        serviceName: formData.serviceName,
+        serviceUrl: formData.serviceUrl || null,
+        username: formData.username || null,
+        encryptedPassword: formData.password,
+        category: selectedCategory || null,
+        notes: formData.notes || null,
+        strengthScore: 0,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        lastUsedAt: null,
+      });
     }
 
-    await saveEntries(updated);
+    if (result?.success) {
+      await loadEntries();
+    }
     setShowForm(false);
     setEditingId(null);
     setFormData({ serviceName: '', serviceUrl: '', username: '', password: '', notes: '' });
-  }, [formData, selectedCategory, editingId, entries, saveEntries]);
+  }, [formData, selectedCategory, editingId, entries, repo, vaultId, loadEntries]);
 
   const handleEdit = useCallback((entry: PasswordEntry) => {
     setEditingId(entry.id);
-    setFormData({ serviceName: entry.serviceName, serviceUrl: entry.serviceUrl, username: entry.username, password: entry.password, notes: entry.notes });
-    setSelectedCategory(entry.category);
+    setFormData({
+      serviceName: entry.serviceName,
+      serviceUrl: entry.serviceUrl || '',
+      username: entry.username || '',
+      password: entry.encryptedPassword,
+      notes: entry.notes || '',
+    });
+    setSelectedCategory(entry.category || 'other');
     setShowForm(true);
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {
-    await saveEntries(entries.filter((e) => e.id !== id));
-  }, [entries, saveEntries]);
+    const result = await repo.delete(id);
+    if (result.success) {
+      await loadEntries();
+    }
+  }, [repo, loadEntries]);
 
   const handleCopy = useCallback(async (text: string, field: string) => {
     await Clipboard.setStringAsync(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   }, []);
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.size === 0) setIsSelecting(false);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setIsSelecting(false);
+  }, []);
+
+  const handleLongPress = useCallback((id: string) => {
+    setIsSelecting(true);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    for (const id of selectedIds) {
+      await repo.delete(id);
+    }
+    clearSelection();
+    await loadEntries();
+  }, [selectedIds, repo, clearSelection, loadEntries]);
 
   const toggleShowPassword = useCallback((id: string) => {
     setShowPasswords((prev) => {
@@ -127,7 +187,7 @@ export default function PasswordsScreen() {
   }, [loadEntries]);
 
   const filtered = search
-    ? entries.filter((e) => e.serviceName.toLowerCase().includes(search.toLowerCase()) || e.username.toLowerCase().includes(search.toLowerCase()) || e.serviceUrl.toLowerCase().includes(search.toLowerCase()))
+    ? entries.filter((e) => e.serviceName.toLowerCase().includes(search.toLowerCase()) || (e.username || '').toLowerCase().includes(search.toLowerCase()) || (e.serviceUrl || '').toLowerCase().includes(search.toLowerCase()))
     : entries;
 
   if (showForm) {
@@ -176,6 +236,15 @@ export default function PasswordsScreen() {
   return (
     <ScreenLayout title={t('passwords.title')} subtitle={t('passwords.savedCount', { count: entries.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
       <SearchBar value={search} onChangeText={setSearch} placeholder={t('passwords.search')} onClear={() => setSearch('')} />
+      {isSelecting && (
+        <SelectionBar
+          selectedCount={selectedIds.size}
+          onClearSelection={clearSelection}
+          actions={[
+            { icon: 'delete-outline', label: t('common.delete'), onPress: handleBatchDelete, destructive: true },
+          ]}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
@@ -191,8 +260,23 @@ export default function PasswordsScreen() {
           />
         ) : (
           filtered.map((item) => (
-            <View key={item.id} style={[styles.entryItem, { borderBottomColor: colors.outlineVariant }]}>
-              <TouchableOpacity onPress={() => handleEdit(item)} style={styles.entryMain}>
+            <View key={item.id} style={[styles.entryItem, { borderBottomColor: colors.outlineVariant }, selectedIds.has(item.id) && { backgroundColor: colors.primaryContainer }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (isSelecting) { toggleSelection(item.id); } else { handleEdit(item); }
+                }}
+                onLongPress={() => handleLongPress(item.id)}
+                style={styles.entryMain}
+              >
+                {isSelecting && (
+                  <View style={styles.checkboxIcon}>
+                    <Icon
+                      name={selectedIds.has(item.id) ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                      size={22}
+                      color={selectedIds.has(item.id) ? colors.primary : colors.onSurfaceVariant}
+                    />
+                  </View>
+                )}
                 <View style={[styles.entryIcon, { backgroundColor: colors.primaryContainer }]}>
                   <Icon name="lock" size={20} color={colors.primary} />
                 </View>
@@ -201,17 +285,19 @@ export default function PasswordsScreen() {
                   <Typography variant="bodySmall" color={colors.onSurfaceVariant}>{item.username}</Typography>
                 </View>
               </TouchableOpacity>
-              <View style={styles.entryActions}>
-                <TouchableOpacity onPress={() => toggleShowPassword(item.id)}>
-                  <Icon name={showPasswords.has(item.id) ? 'eye-off' : 'eye'} size={20} color={colors.onSurfaceVariant} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleCopy(item.password, `pwd-${item.id}`)}>
-                  <Icon name="content-copy" size={20} color={copiedField === `pwd-${item.id}` ? colors.primary : colors.onSurfaceVariant} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                  <Icon name="delete-outline" size={20} color={colors.error} />
-                </TouchableOpacity>
-              </View>
+              {!isSelecting && (
+                <View style={styles.entryActions}>
+                  <TouchableOpacity onPress={() => toggleShowPassword(item.id)}>
+                    <Icon name={showPasswords.has(item.id) ? 'eye-off' : 'eye'} size={20} color={colors.onSurfaceVariant} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleCopy(item.encryptedPassword, `pwd-${item.id}`)}>
+                    <Icon name="content-copy" size={20} color={copiedField === `pwd-${item.id}` ? colors.primary : colors.onSurfaceVariant} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                    <Icon name="delete-outline" size={20} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))
         )}
@@ -225,6 +311,9 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: spacing.xxxl,
     flexGrow: 1,
+  },
+  checkboxIcon: {
+    marginRight: spacing.sm,
   },
   entryItem: {
     flexDirection: 'row',

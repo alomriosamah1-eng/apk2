@@ -33,7 +33,7 @@ const TYPE_COLORS: Record<string, string> = {
   file: '#78909C',
 };
 
-function ItemRowComponent({ item, onPress, onLongPress }: ItemRowProps) {
+function ItemRowComponent({ item, onPress, onLongPress, showCheckbox, isSelected }: ItemRowProps) {
   const { colors } = useTheme();
 
   return (
@@ -43,8 +43,17 @@ function ItemRowComponent({ item, onPress, onLongPress }: ItemRowProps) {
       activeOpacity={0.6}
       accessibilityRole="button"
       accessibilityLabel={`${item.name}, ${item.type}`}
-      style={[styles.container, { borderBottomColor: colors.outlineVariant }]}
+      style={[styles.container, { borderBottomColor: colors.outlineVariant }, isSelected && { backgroundColor: colors.primaryContainer }]}
     >
+      {showCheckbox && (
+        <View style={styles.checkboxContainer}>
+          <Icon
+            name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+            size={22}
+            color={isSelected ? colors.primary : colors.onSurfaceVariant}
+          />
+        </View>
+      )}
       <View style={[styles.iconContainer, { backgroundColor: (TYPE_COLORS[item.type] ?? '#78909C') + '20' }]}>
         <Icon
           name={TYPE_ICONS[item.type] ?? 'file'}
@@ -77,6 +86,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     minHeight: 56,
+  },
+  checkboxContainer: {
+    marginRight: spacing.sm,
   },
   iconContainer: {
     width: 40,

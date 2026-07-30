@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, RefreshControl, TouchableOpacity, TextInput as RNTextInput, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
@@ -8,26 +8,21 @@ import { Typography } from '@ui/components/atoms/Typography';
 import { EmptyState } from '@ui/components/atoms/EmptyState';
 import { SearchBar } from '@ui/components/molecules/SearchBar';
 import { FloatingButton } from '@ui/components/molecules/FloatingButton';
+import { SelectionBar } from '@ui/components/organisms/SelectionBar';
 import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@ui/components/atoms/Icon';
-import { useSecureStorage } from '@ui/hooks/useSecureStorage';
-
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  updatedAt: number;
-  isPinned: boolean;
-}
-
-const NOTES_STORAGE_KEY = 'khaznati_notes';
+import { DIContainer } from '@core/di/container';
+import { INoteRepository } from '@domain/repositories/INoteRepository';
+import { Note } from '@domain/entities/Note';
+import { generateId } from '@core/utils';
 
 export default function NotesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { getItem, setItem } = useSecureStorage();
+  const { vaultId: paramsVaultId } = useLocalSearchParams<{ vaultId: string }>();
+  const vaultId = paramsVaultId || '';
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,64 +31,112 @@ export default function NotesScreen() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelecting, setIsSelecting] = useState(false);
+
+  const repo = useMemo(
+    () => DIContainer.resolve<INoteRepository>('NoteRepository'),
+    [],
+  );
 
   const loadNotes = useCallback(async () => {
-    try {
-      setError(null);
-      const stored = await getItem(NOTES_STORAGE_KEY);
-      setNotes(stored ? JSON.parse(stored) : []);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    setError(null);
+    const result = await repo.findByVaultId(vaultId);
+    if (result.success) {
+      setNotes(result.data);
+    } else {
+      setError(result.error.message);
     }
-  }, [getItem]);
+    setLoading(false);
+    setRefreshing(false);
+  }, [repo, vaultId]);
 
   useEffect(() => {
     loadNotes();
   }, [loadNotes]);
 
-  const saveNotes = useCallback(async (updatedNotes: Note[]) => {
-    await setItem(NOTES_STORAGE_KEY, JSON.stringify(updatedNotes));
-    setNotes(updatedNotes);
-  }, [setItem]);
-
   const handleCreate = useCallback(() => {
-    setEditingNote({ id: Date.now().toString(), title: '', content: '', updatedAt: Date.now(), isPinned: false });
+    setEditingNote({
+      id: generateId(),
+      vaultId,
+      title: '',
+      encryptedContent: '',
+      isEncrypted: false,
+      color: null,
+      isPinned: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
     setEditTitle('');
     setEditContent('');
-  }, []);
+  }, [vaultId]);
 
   const handleSaveNote = useCallback(async () => {
     if (!editingNote) return;
-    const updated = { ...editingNote, title: editTitle, content: editContent, updatedAt: Date.now() };
+    const updated: Note = {
+      ...editingNote,
+      title: editTitle,
+      encryptedContent: editContent,
+      updatedAt: Date.now(),
+    };
 
-    let updatedNotes: Note[];
     const existingIndex = notes.findIndex((n) => n.id === editingNote.id);
-    if (existingIndex >= 0) {
-      updatedNotes = [...notes];
-      updatedNotes[existingIndex] = updated;
-    } else {
-      updatedNotes = [updated, ...notes];
+    const result = existingIndex >= 0
+      ? await repo.update(updated)
+      : await repo.create(updated);
+    if (result.success) {
+      await loadNotes();
     }
-
-    await saveNotes(updatedNotes);
     setEditingNote(null);
-  }, [editingNote, editTitle, editContent, notes, saveNotes]);
+  }, [editingNote, editTitle, editContent, notes, repo, loadNotes]);
 
   const handleDelete = useCallback(async (id: string) => {
-    await saveNotes(notes.filter((n) => n.id !== id));
-  }, [notes, saveNotes]);
+    const result = await repo.delete(id);
+    if (result.success) {
+      await loadNotes();
+    }
+  }, [repo, loadNotes]);
 
   const handleTogglePin = useCallback(async (id: string) => {
-    await saveNotes(notes.map((n) => (n.id === id ? { ...n, isPinned: !n.isPinned } : n)));
-  }, [notes, saveNotes]);
+    await repo.togglePin(id);
+    await loadNotes();
+  }, [repo, loadNotes]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadNotes();
   }, [loadNotes]);
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.size === 0) setIsSelecting(false);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setIsSelecting(false);
+  }, []);
+
+  const handleLongPress = useCallback((id: string) => {
+    setIsSelecting(true);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    for (const id of selectedIds) {
+      await repo.delete(id);
+    }
+    clearSelection();
+    await loadNotes();
+  }, [selectedIds, repo, clearSelection, loadNotes]);
 
   const sortedNotes = [...notes].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -101,7 +144,7 @@ export default function NotesScreen() {
   });
 
   const filteredNotes = search
-    ? sortedNotes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase()))
+    ? sortedNotes.filter((n) => n.title.toLowerCase().includes(search.toLowerCase()) || n.encryptedContent.toLowerCase().includes(search.toLowerCase()))
     : sortedNotes;
 
   if (editingNote) {
@@ -149,6 +192,15 @@ export default function NotesScreen() {
   return (
     <ScreenLayout title={t('notes.title')} subtitle={t('vault.itemsCount', { count: notes.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
       <SearchBar value={search} onChangeText={setSearch} placeholder={t('notes.search')} onClear={() => setSearch('')} />
+      {isSelecting && (
+        <SelectionBar
+          selectedCount={selectedIds.size}
+          onClearSelection={clearSelection}
+          actions={[
+            { icon: 'delete-outline', label: t('common.delete'), onPress: handleBatchDelete, destructive: true },
+          ]}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
@@ -166,31 +218,51 @@ export default function NotesScreen() {
           filteredNotes.map((item) => (
             <TouchableOpacity
               key={item.id}
-              onPress={() => { setEditingNote(item); setEditTitle(item.title); setEditContent(item.content); }}
-              style={[styles.noteItem, { borderBottomColor: colors.outlineVariant }]}
+              onPress={() => {
+                if (isSelecting) {
+                  toggleSelection(item.id);
+                } else {
+                  setEditingNote(item);
+                  setEditTitle(item.title);
+                  setEditContent(item.encryptedContent);
+                }
+              }}
+              onLongPress={() => handleLongPress(item.id)}
+              style={[styles.noteItem, { borderBottomColor: colors.outlineVariant }, selectedIds.has(item.id) && { backgroundColor: colors.primaryContainer }]}
             >
               <View style={styles.noteHeader}>
+                {isSelecting && (
+                  <View style={styles.checkboxIcon}>
+                    <Icon
+                      name={selectedIds.has(item.id) ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                      size={22}
+                      color={selectedIds.has(item.id) ? colors.primary : colors.onSurfaceVariant}
+                    />
+                  </View>
+                )}
                 <Typography variant="bodyLarge" numberOfLines={1} style={styles.noteTitle}>
                   {item.title || t('notes.untitled')}
                 </Typography>
                 {item.isPinned && <Icon name="pin" size={16} color={colors.primary} />}
               </View>
               <Typography variant="bodySmall" color={colors.onSurfaceVariant} numberOfLines={2}>
-                {item.content || t('notes.noContent')}
+                {item.encryptedContent || t('notes.noContent')}
               </Typography>
-              <View style={styles.noteFooter}>
-                <Typography variant="labelSmall" color={colors.onSurfaceVariant}>
-                  {new Date(item.updatedAt).toLocaleDateString()}
-                </Typography>
-                <View style={styles.noteActions}>
-                  <TouchableOpacity onPress={() => handleTogglePin(item.id)}>
-                    <Icon name="pin-outline" size={18} color={colors.onSurfaceVariant} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                    <Icon name="delete-outline" size={18} color={colors.error} />
-                  </TouchableOpacity>
+              {!isSelecting && (
+                <View style={styles.noteFooter}>
+                  <Typography variant="labelSmall" color={colors.onSurfaceVariant}>
+                    {new Date(item.updatedAt).toLocaleDateString()}
+                  </Typography>
+                  <View style={styles.noteActions}>
+                    <TouchableOpacity onPress={() => handleTogglePin(item.id)}>
+                      <Icon name="pin-outline" size={18} color={colors.onSurfaceVariant} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                      <Icon name="delete-outline" size={18} color={colors.error} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              )}
             </TouchableOpacity>
           ))
         )}
@@ -204,6 +276,9 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: spacing.xxxl,
     flexGrow: 1,
+  },
+  checkboxIcon: {
+    marginRight: spacing.sm,
   },
   noteItem: {
     paddingHorizontal: spacing.lg,

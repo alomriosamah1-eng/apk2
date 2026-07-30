@@ -2234,11 +2234,11 @@ echo "=== EXPO DOCTOR ===" && npx expo-doctor 2>&1 | tail -3
 | S-01-05 | إزالة validation.ts | [✅] |
 | S-01-06 | إزالة CircuitBreaker | [✅] |
 | S-01-07 | إزالة NeuButton/Card/Input | [✅] |
-| S-01-08 | biometryType تفضيل الوجه | [ ] |
-| S-01-09 | إصلاح Domain→Data dependency | [ ] |
-| S-01-10 | إزالة Service Locator | [ ] |
-| S-01-11 | Brute Force Lockout | [ ] |
-| S-01-12 | إصلاح Migration 002 | [ ] |
+| S-01-08 | biometryType تفضيل الوجه | [✅] |
+| S-01-09 | إصلاح Domain→Data dependency | [✅] |
+| S-01-10 | إزالة Service Locator | [✅] |
+| S-01-11 | Brute Force Lockout | [✅] |
+| S-01-12 | إصلاح Migration 002 | [✅] |
 | S-02-01 | Notes → SQLite | [ ] |
 | S-02-02 | Passwords → SQLite | [ ] |
 | S-02-03 | Files → ItemRepository | [ ] |
