@@ -19,6 +19,8 @@ export interface IVaultRepository {
   lock(id: string): Promise<Result<void>>;
   /** Unlocks a vault, making its contents accessible. */
   unlock(id: string): Promise<Result<void>>;
+  /** Updates specific fields of a vault by ID. */
+  updateFields(id: string, fields: Partial<Pick<Vault, 'failedAttempts' | 'lockedUntil'>>): Promise<Result<void>>;
   /** Returns the total number of vaults. */
   count(): Promise<Result<number>>;
 }

@@ -37,19 +37,36 @@ export function useBiometrics() {
     }
 
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
-    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-    const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    if (!hasHardware) {
+      setState({ isAvailable: false, isEnrolled: false, biometryType: null });
+      return;
+    }
 
-    const preferred = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
-      ? LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
-      : supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)
-        ? LocalAuthentication.AuthenticationType.IRIS
-        : supportedTypes[0] ?? null;
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    if (!isEnrolled) {
+      setState({ isAvailable: false, isEnrolled: false, biometryType: null });
+      return;
+    }
+
+    let biometryType: BiometricType = 'fingerprint';
+
+    try {
+      const level = await LocalAuthentication.getEnrolledLevelAsync();
+      biometryType = level === 2 ? 'face' : 'fingerprint';
+    } catch {
+      const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      const preferred = supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+        ? LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
+        : supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)
+          ? LocalAuthentication.AuthenticationType.IRIS
+          : supportedTypes[0] ?? null;
+      biometryType = preferred ? mapAuthType(preferred) : null;
+    }
 
     setState({
-      isAvailable: hasHardware && isEnrolled && preferred !== null,
+      isAvailable: true,
       isEnrolled,
-      biometryType: preferred ? mapAuthType(preferred) : null,
+      biometryType,
     });
   }, []);
 

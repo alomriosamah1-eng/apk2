@@ -1,5 +1,5 @@
 import { IVaultRepository } from '@domain/repositories/IVaultRepository';
-import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
+import { ISecureStorage } from '@domain/repositories/ISecureStorage';
 import { Result, failure, AuthenticationError } from '@core/errors';
 import { hashPin } from '@core/utils';
 
@@ -8,7 +8,7 @@ export class BiometricUnlockUseCase {
 
   constructor(
     private vaultRepository: IVaultRepository,
-    private secureStorage: SecureStorageSource,
+    private secureStorage: ISecureStorage,
   ) {}
 
   async execute(vaultId: string): Promise<Result<void>> {

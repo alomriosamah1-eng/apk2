@@ -47,6 +47,8 @@ export class CreateVaultUseCase {
       isLocked: false,
       encryptedPinHash,
       pinSalt,
+      failedAttempts: 0,
+      lockedUntil: null,
       itemCount: 0,
       totalSize: 0,
       backupVersion: 0,

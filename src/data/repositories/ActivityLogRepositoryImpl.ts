@@ -27,11 +27,12 @@ export class ActivityLogRepositoryImpl implements IActivityLogRepository {
         target_type: targetType ?? null,
         target_id: targetId ?? null,
         metadata_json: metadata ? JSON.stringify(metadata) : null,
+        vault_id: undefined,
         created_at: this.db.now(),
       };
       await this.db.executeSql(
-        'INSERT INTO activity_log (id, action, target_type, target_id, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [entry.id, entry.action, entry.target_type, entry.target_id, entry.metadata_json, entry.created_at],
+        'INSERT INTO activity_log (id, vault_id, action, target_type, target_id, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [entry.id, entry.vault_id, entry.action, entry.target_type, entry.target_id, entry.metadata_json, entry.created_at],
       );
       return success(undefined);
     } catch (error) {

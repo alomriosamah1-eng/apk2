@@ -6,20 +6,21 @@ import { NoteMapper } from '@data/mappers/NoteMapper';
 import { DatabaseService } from '@data/database/DatabaseService';
 import { encryptData, decryptData, generateEncryptionKey } from '@core/utils/crypto';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
-import { DIContainer } from '@core/di/container';
 
 export class NoteRepositoryImpl implements INoteRepository {
   private mapper = new NoteMapper();
 
-  constructor(private db: DatabaseService) {}
+  constructor(
+    private db: DatabaseService,
+    private secureStorage: SecureStorageSource,
+  ) {}
 
   private async getVaultKey(vaultId: string): Promise<string> {
-    const storage = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
     const keyKey = `note_vault_key_${vaultId}`;
-    let key = await storage.get(keyKey);
+    let key = await this.secureStorage.get(keyKey);
     if (!key) {
       key = await generateEncryptionKey();
-      await storage.set(keyKey, key);
+      await this.secureStorage.set(keyKey, key);
     }
     return key;
   }

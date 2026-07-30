@@ -64,7 +64,7 @@ export default function LoginScreen() {
       }
       router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: targetVault.id } });
     } else {
-      setError(t('errors.invalidPin'));
+      setError(result.error.message);
       setPassword('');
     }
     setLoginLoading(false);

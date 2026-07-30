@@ -8,6 +8,7 @@ export class ActivityLogMapper {
   toEntity(dto: ActivityLogDTO): ActivityLogEntry {
     return {
       id: dto.id,
+      vaultId: dto.vault_id,
       action: dto.action as ActivityAction,
       targetType: dto.target_type,
       targetId: dto.target_id,
@@ -20,6 +21,7 @@ export class ActivityLogMapper {
   toDTO(entity: ActivityLogEntry): ActivityLogDTO {
     return {
       id: entity.id,
+      vault_id: entity.vaultId,
       action: entity.action,
       target_type: entity.targetType,
       target_id: entity.targetId,

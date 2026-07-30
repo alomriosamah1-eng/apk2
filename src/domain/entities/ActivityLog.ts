@@ -4,6 +4,8 @@ import { ActivityAction } from '@core/constants';
 export interface ActivityLogEntry {
   /** Unique identifier for the log entry. */
   id: string;
+  /** ID of the vault this entry belongs to, if applicable. */
+  vaultId?: string;
   /** The action that was performed. */
   action: ActivityAction;
   /** Type of the target entity, or null. */

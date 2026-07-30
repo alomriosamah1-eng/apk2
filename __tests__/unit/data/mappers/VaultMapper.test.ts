@@ -17,6 +17,8 @@ describe('VaultMapper', () => {
     isLocked: false,
     encryptedPinHash: 'abc123',
     pinSalt: 'def456',
+    failedAttempts: 0,
+    lockedUntil: null,
     itemCount: 5,
     totalSize: 1000,
     backupVersion: 1,

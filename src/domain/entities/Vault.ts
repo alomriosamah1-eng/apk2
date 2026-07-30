@@ -24,6 +24,10 @@ export interface Vault {
   encryptedPinHash: string;
   /** Salt used for PIN hashing. */
   pinSalt: string;
+  /** Number of consecutive failed login attempts. */
+  failedAttempts: number;
+  /** Timestamp (ms) until the vault is locked, or null if not locked. */
+  lockedUntil: number | null;
   /** Number of items stored in the vault. */
   itemCount: number;
   /** Total size (bytes) of vault contents. */

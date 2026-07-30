@@ -34,7 +34,9 @@ export function registerDependencies(): void {
   // Data Sources
   DIContainer.registerSingleton('DatabaseService', () => new DatabaseService());
   DIContainer.registerSingleton('SecureStorageSource', () => new SecureStorageSource());
-  DIContainer.registerSingleton('FileSystemSource', () => new FileSystemSource());
+  DIContainer.registerSingleton('FileSystemSource', () => new FileSystemSource(
+    DIContainer.resolve<SecureStorageSource>('SecureStorageSource'),
+  ));
 
   // Migration Runner
   const migrationRunner = createMigrationRunner();
@@ -48,10 +50,16 @@ export function registerDependencies(): void {
     new ItemRepositoryImpl(DIContainer.resolve<DatabaseService>('DatabaseService')),
   );
   DIContainer.registerSingleton('NoteRepository', () =>
-    new NoteRepositoryImpl(DIContainer.resolve<DatabaseService>('DatabaseService')),
+    new NoteRepositoryImpl(
+      DIContainer.resolve<DatabaseService>('DatabaseService'),
+      DIContainer.resolve<SecureStorageSource>('SecureStorageSource'),
+    ),
   );
   DIContainer.registerSingleton('PasswordRepository', () =>
-    new PasswordRepositoryImpl(DIContainer.resolve<DatabaseService>('DatabaseService')),
+    new PasswordRepositoryImpl(
+      DIContainer.resolve<DatabaseService>('DatabaseService'),
+      DIContainer.resolve<SecureStorageSource>('SecureStorageSource'),
+    ),
   );
   DIContainer.registerSingleton('ActivityLogRepository', () =>
     new ActivityLogRepositoryImpl(DIContainer.resolve<DatabaseService>('DatabaseService')),

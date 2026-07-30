@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS vaults (
     is_locked INTEGER NOT NULL DEFAULT 1,
     encrypted_pin_hash TEXT NOT NULL,
     pin_salt TEXT NOT NULL,
+    failed_attempts INTEGER DEFAULT 0,
+    locked_until INTEGER,
     item_count INTEGER DEFAULT 0,
     total_size INTEGER DEFAULT 0,
     backup_version INTEGER DEFAULT 0
@@ -68,11 +70,13 @@ CREATE TABLE IF NOT EXISTS passwords (
 
 CREATE TABLE IF NOT EXISTS activity_log (
     id TEXT PRIMARY KEY NOT NULL,
+    vault_id TEXT,
     action TEXT NOT NULL,
     target_type TEXT,
     target_id TEXT,
     metadata_json TEXT,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS settings (

@@ -1,7 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
+import { ISecureStorage } from '@domain/repositories/ISecureStorage';
 
 /** Wraps expo-secure-store for persistent, encrypted key-value storage. */
-export class SecureStorageSource {
+export class SecureStorageSource implements ISecureStorage {
   /** Stores a value under the given key in secure storage. */
   async set(key: string, value: string): Promise<void> {
     await SecureStore.setItemAsync(key, value, {

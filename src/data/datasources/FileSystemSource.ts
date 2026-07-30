@@ -2,12 +2,11 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Crypto from 'expo-crypto';
 import { encryptData, decryptData, generateEncryptionKey } from '@core/utils/crypto';
 import { SecureStorageSource } from './SecureStorageSource';
-import { DIContainer } from '@core/di/container';
 
 export class FileSystemSource {
   private basePath: string;
 
-  constructor() {
+  constructor(private secureStorage: SecureStorageSource) {
     this.basePath = `${FileSystem.documentDirectory}khaznati`;
   }
 
@@ -37,12 +36,11 @@ export class FileSystemSource {
   }
 
   private async getVaultKey(vaultId: string): Promise<string> {
-    const storage = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
     const keyKey = `file_vault_key_${vaultId}`;
-    let key = await storage.get(keyKey);
+    let key = await this.secureStorage.get(keyKey);
     if (!key) {
       key = await generateEncryptionKey();
-      await storage.set(keyKey, key);
+      await this.secureStorage.set(keyKey, key);
     }
     return key;
   }

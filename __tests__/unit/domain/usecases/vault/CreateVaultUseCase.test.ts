@@ -11,6 +11,7 @@ describe('CreateVaultUseCase', () => {
     findById: jest.fn(),
     findAll: jest.fn(),
     update: jest.fn(),
+    updateFields: jest.fn(),
     delete: jest.fn(),
     updateLastAccessed: jest.fn(),
     lock: jest.fn(),

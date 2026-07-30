@@ -2225,8 +2225,8 @@ echo "=== EXPO DOCTOR ===" && npx expo-doctor 2>&1 | tail -3
 | # | الخطوة | الحالة |
 |---|--------|--------|
 | S-00-01 | Backup المشروع | [ ] |
-| S-00-02 | تثبيت المكتبات | [ ] |
-| S-00-03 | CI --legacy-peer-deps | [ ] |
+| S-00-02 | تثبيت المكتبات | [✅] |
+| S-00-03 | CI --legacy-peer-deps | [✅] |
 | S-01-01 | crypto.ts AES-256-GCM + tag | [✅] |
 | S-01-02 | hashPin PBKDF2 100k | [✅] |
 | S-01-03 | إزالة deriveKeyFromPin المكرر | [✅] |
