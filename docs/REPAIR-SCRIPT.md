@@ -83,7 +83,7 @@ npx expo start --port 8083 &
 sleep 15
 ```
 **التحقق:** `node -e "require('expo-build-properties')" && echo "OK"`
-**[ ]** ← نفّذ الأمر في `packages.md` أولاً
+**[✅]**
 
 ---
 
