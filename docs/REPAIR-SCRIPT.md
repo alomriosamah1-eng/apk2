@@ -109,7 +109,7 @@ run: npm ci --legacy-peer-deps
 **التحقق:** `grep "npm ci" .github/workflows/*.yml` — كلها يجب أن تكون `npm ci --legacy-peer-deps`
 
 **التراجع:** `git checkout -- .github/workflows/`
-**[ ]**
+**[✅]**
 
 ---
 
