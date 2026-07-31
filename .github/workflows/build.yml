@@ -86,6 +86,29 @@ jobs:
           org.gradle.caching=true
           EOF
 
+      - name: Configure release signing
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          cat >> android/gradle.properties <<EOF
+          MYAPP_RELEASE_STORE_FILE=release.keystore
+          MYAPP_RELEASE_STORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD
+          MYAPP_RELEASE_KEY_ALIAS=$ANDROID_KEY_ALIAS
+          MYAPP_RELEASE_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
+          EOF
+          python3 - <<'PY'
+          p = 'android/app/build.gradle'
+          s = open(p).read()
+          s = s.replace("        }\n    }", "        }\n        release {\n            storeFile file(MYAPP_RELEASE_STORE_FILE)\n            storePassword MYAPP_RELEASE_STORE_PASSWORD\n            keyAlias MYAPP_RELEASE_KEY_ALIAS\n            keyPassword MYAPP_RELEASE_KEY_PASSWORD\n            storeType 'PKCS12'\n        }\n    }", 1)
+          s = s.replace("signingConfig signingConfigs.debug\n            def enableShrinkResources", "signingConfig signingConfigs.release\n            def enableShrinkResources")
+          open(p, 'w').write(s)
+          PY
+
       - name: Warm Gradle caches
         timeout-minutes: 20
         run: |
