@@ -1,9 +1,10 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { Icon } from '@ui/components/atoms/Icon';
 
-export default function TabLayout() {
+export default function TabLayout(): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
 

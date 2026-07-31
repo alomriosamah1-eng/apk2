@@ -1,65 +1,29 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, RefreshControl, Dimensions, ScrollView, TouchableOpacity, Alert, Share } from 'react-native';
-import { Image } from 'expo-image';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Alert, Share } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { Paths, Directory, File } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
-import { spacing, borderRadius } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
-import { EmptyState } from '@ui/components/atoms/EmptyState';
 import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
-import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
 import { SearchBar } from '@ui/components/molecules/SearchBar';
 import { SelectionBar } from '@ui/components/organisms/SelectionBar';
+import { MediaItem } from '@ui/components/molecules/MediaThumb';
+import { MediaPreview } from '@ui/components/molecules/MediaPreview';
+import { MediaGallery } from '@ui/components/molecules/MediaGallery';
 import { useTranslation } from 'react-i18next';
-import { encryptFile, decryptFile, generateEncryptionKey } from '@core/utils/crypto';
-import { DIContainer } from '@core/di/container';
-import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
-import { IItemRepository } from '@domain/repositories/IItemRepository';
-import { ItemType } from '@core/constants';
-import { generateId } from '@core/utils';
+import { encryptFile, decryptFile } from '@core/utils/crypto';
+import { getVaultKey, getEncryptedDir, persistEncryptedImage } from '@data/media/MediaStorage';
 
-const NUM_COLUMNS = 3;
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const ITEM_SIZE = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-
-interface MediaItem {
-  id: string;
-  name: string;
-  encryptedPath: string;
-  decryptedUri: string | null;
-}
-
-async function getVaultKey(vaultId: string): Promise<string> {
-  const storage = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
-  const keyKey = `media_vault_key_${vaultId}`;
-  let key = await storage.get(keyKey);
-  if (!key) {
-    key = await generateEncryptionKey();
-    await storage.set(keyKey, key);
-  }
-  return key;
-}
-
-function getEncryptedDir(vaultId: string): Directory {
-  return new Directory(Paths.document, 'khaznati', vaultId || 'default', '.encrypted_media');
-}
-
-export default function MediaScreen() {
+export default function MediaScreen(): React.JSX.Element {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { vaultId } = useLocalSearchParams<{ vaultId: string }>();
   const vid = vaultId || 'default';
   const [media, setMedia] = useState<MediaItem[]>([]);
-
-  const itemRepo = useMemo(
-    () => DIContainer.resolve<IItemRepository>('ItemRepository'),
-    [],
-  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +81,7 @@ export default function MediaScreen() {
       {
         text: t('common.delete'),
         style: 'destructive',
-        onPress: () => {
+        onPress: (): void => {
           selectedIds.forEach((id) => {
             const item = media.find((m) => m.id === id);
             if (item) new File(item.encryptedPath).delete();
@@ -148,37 +112,15 @@ export default function MediaScreen() {
         Alert.alert(t('common.error'), t('errors.general'));
         return;
       }
-
-      const encDir = getEncryptedDir(vid);
-      if (!encDir.exists) encDir.create({ intermediates: true, idempotent: true });
-
       const key = await getVaultKey(vid);
       const encryptedBase64 = await encryptFile(key, asset.base64);
-
-      const ext = (asset.fileName || 'photo.jpg').split('.').pop() || 'jpg';
-      const encFileName = `${Date.now()}.${ext}.enc`;
-      const encFile = new File(encDir, encFileName);
-      await encFile.write(encryptedBase64);
-
-      await itemRepo.create({
-        id: generateId(),
+      await persistEncryptedImage({
         vaultId: vid,
-        parentId: null,
         name: asset.fileName || 'photo.jpg',
-        type: ItemType.IMAGE,
         mimeType: asset.mimeType || 'image/jpeg',
         size: asset.fileSize || 0,
-        encryptedPath: encFile.uri,
-        encryptedData: null,
-        thumbnailPath: null,
-        metadata: null,
-        isFavorite: false,
-        isDeleted: false,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        deletedAt: null,
+        encryptedBase64,
       });
-
       loadMedia();
     } catch (err) {
       Alert.alert(t('common.error'), (err as Error).message);
@@ -241,20 +183,14 @@ export default function MediaScreen() {
   return (
     <ScreenLayout title={t('media.title')} subtitle={t('vault.itemsCount', { count: media.length })} showBack onBack={() => router.push({ pathname: '/(app)/(tabs)/vault', params: { vaultId: vid } })}>
       {selectedItem ? (
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: selectedItem.decryptedUri! }} style={styles.previewImage} contentFit="contain" accessibilityLabel={selectedItem.name} />
-          <View style={styles.previewActions}>
-            <TouchableOpacity onPress={() => setMedia((prev) => prev.map((m) => ({ ...m, decryptedUri: null })))} style={[styles.previewBtn, { borderColor: colors.outline }]}>
-              <Typography>{t('common.back')}</Typography>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleExport(selectedItem)} style={[styles.previewBtn, { backgroundColor: colors.primary }]}>
-              <Typography color="#FFFFFF">{t('media.export')}</Typography>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <MediaPreview
+          item={selectedItem}
+          onBack={() => setMedia((prev) => prev.map((m) => ({ ...m, decryptedUri: null })))}
+          onExport={() => handleExport(selectedItem)}
+        />
       ) : (
         <View style={styles.flexOne}>
-          <SearchBar value={search} onChangeText={setSearch} placeholder={t('media.search') || 'Search'} onClear={() => setSearch('')} />
+          <SearchBar value={search} onChangeText={setSearch} placeholder={t('media.search')} onClear={() => setSearch('')} />
           <SelectionBar
             selectedCount={selectedIds.size}
             onClearSelection={clearSelection}
@@ -263,46 +199,16 @@ export default function MediaScreen() {
               { icon: 'delete', label: t('common.delete'), onPress: handleBatchDelete, destructive: true },
             ]}
           />
-          <ScrollView
-            contentContainerStyle={styles.grid}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-            showsVerticalScrollIndicator={false}
-          >
-            {filteredMedia.length === 0 ? (
-              <EmptyState
-                icon="image-multiple-outline"
-                title={search ? t('common.noResults') : t('media.empty')}
-                description={search ? t('common.noResults') : t('media.emptyDesc')}
-                actionLabel={search ? undefined : t('files.addFile')}
-                onAction={search ? undefined : handleImport}
-              />
-            ) : (
-              <View style={styles.gridRow}>
-                {filteredMedia.map((item, index) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    onPress={() => handleView(item)}
-                    onLongPress={() => toggleSelection(item.id)}
-                    style={styles.mediaItem}
-                  >
-                    <View style={[styles.thumbnail, { backgroundColor: colors.surfaceVariant }]}>
-                      {selectedIds.has(item.id) && (
-                        <View style={[styles.checkOverlay, { backgroundColor: colors.primary + '33' }]}>
-                          <Icon name="check-circle" size={24} color={colors.primary} />
-                        </View>
-                      )}
-                      <Icon name="image" size={28} color={colors.onSurfaceVariant} />
-                      {index < 3 && (
-                        <Typography variant="caption" color={colors.onSurfaceVariant} style={styles.fileName} numberOfLines={1}>
-                          {item.name}
-                        </Typography>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </ScrollView>
+          <MediaGallery
+            items={filteredMedia}
+            search={search}
+            refreshing={refreshing}
+            selectedIds={selectedIds}
+            onRefresh={handleRefresh}
+            onToggle={toggleSelection}
+            onView={handleView}
+            onImport={handleImport}
+          />
         </View>
       )}
       {!selectedItem && (
@@ -322,59 +228,6 @@ export default function MediaScreen() {
 
 const styles = StyleSheet.create({
   flexOne: { flex: 1 },
-  grid: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxxl,
-    flexGrow: 1,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  mediaItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  fileName: {
-    marginTop: spacing.xs,
-    paddingHorizontal: 4,
-  },
-  previewContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  previewImage: {
-    flex: 1,
-  },
-  previewActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  previewBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-  },
   fab: {
     position: 'absolute',
     bottom: 24,
