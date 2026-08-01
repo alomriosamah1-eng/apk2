@@ -36,6 +36,22 @@ export class ValidationError extends DomainError {
   }
 }
 
+/** Discriminating error codes for crypto failures (Recovery/05 §5.16). */
+export enum CryptoErrorCode {
+  TAMPER = 'TAMPER',
+  BAD_KEY = 'BAD_KEY',
+  BAD_FORMAT = 'BAD_FORMAT',
+  UNSUPPORTED_VERSION = 'UNSUPPORTED_VERSION',
+}
+
+/** Error thrown when encryption/decryption fails. Never to be silently swallowed. */
+export class CryptoError extends DomainError {
+  constructor(code: CryptoErrorCode, message: string) {
+    super(message, code, { reason: code });
+    this.name = 'CryptoError';
+  }
+}
+
 /** Discriminated union type representing either a successful result or a failure. */
 export type Result<T, E = DomainError> =
   | { success: true; data: T }

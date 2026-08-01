@@ -4,7 +4,7 @@ import { Result, success, failure, DatabaseError } from '@core/errors';
 import { NoteDTO } from '@data/dto/NoteDTO';
 import { NoteMapper } from '@data/mappers/NoteMapper';
 import { DatabaseService } from '@data/database/DatabaseService';
-import { encryptData, decryptData, generateEncryptionKey } from '@core/utils/crypto';
+import { encryptData, decryptData, generateEncryptionKey, CryptoError } from '@core/utils/crypto';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 
 export class NoteRepositoryImpl implements INoteRepository {
@@ -48,6 +48,9 @@ export class NoteRepositoryImpl implements INoteRepository {
       if (!row) return success(null);
       return this.decryptNote(row);
     } catch (error) {
+      if (error instanceof CryptoError) {
+        return failure(error);
+      }
       return failure(new DatabaseError('Failed to find note', (error as Error).message));
     }
   }
@@ -61,6 +64,9 @@ export class NoteRepositoryImpl implements INoteRepository {
       const notes = await Promise.all(rows.map((r) => this.decryptNote(r)));
       return success(notes.flatMap((n) => (n.success ? [n.data] : [])));
     } catch (error) {
+      if (error instanceof CryptoError) {
+        return failure(error);
+      }
       return failure(new DatabaseError('Failed to find notes', (error as Error).message));
     }
   }
@@ -112,19 +118,26 @@ export class NoteRepositoryImpl implements INoteRepository {
       const notes = await Promise.all(rows.map((r) => this.decryptNote(r)));
       return success(notes.flatMap((n) => (n.success ? [n.data] : [])));
     } catch (error) {
+      if (error instanceof CryptoError) {
+        return failure(error);
+      }
       return failure(new DatabaseError('Failed to search notes', (error as Error).message));
     }
   }
 
+  /** Decrypts a note; throws {@link CryptoError} on tamper instead of returning a placeholder. */
   private async decryptNote(row: NoteDTO): Promise<Result<Note>> {
     const note = this.mapper.toEntity(row);
     try {
       const vaultKey = await this.getVaultKey(note.vaultId);
       note.encryptedContent = await decryptData(vaultKey, row.encrypted_content);
       note.isEncrypted = true;
-    } catch {
-      note.encryptedContent = '[encrypted]';
+      return success(note);
+    } catch (error) {
+      if (error instanceof CryptoError) {
+        throw error;
+      }
+      return success(note);
     }
-    return success(note);
   }
 }

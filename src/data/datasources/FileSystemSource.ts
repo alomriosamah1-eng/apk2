@@ -15,7 +15,6 @@ export class FileSystemSource {
       this.basePath,
       `${this.basePath}/files`,
       `${this.basePath}/thumbnails`,
-      `${this.basePath}/backups`,
       `${this.basePath}/temp`,
     ];
 

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Alert, Share } from 'react-native';
+import { View, StyleSheet, Alert, Share, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Paths, File, Directory } from 'expo-file-system';
@@ -16,23 +16,25 @@ import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { FileItem } from '@ui/components/molecules/FileRow';
 import { DIContainer } from '@core/di/container';
 import { IItemRepository } from '@domain/repositories/IItemRepository';
-import { ItemType } from '@core/constants';
+import { ItemType, ActivityAction } from '@core/constants';
 import { generateId } from '@core/utils';
+import { encryptFile } from '@core/utils/crypto';
+import { getVaultKey, exportDecryptedToLibrary, readAndDecryptFile } from '@data/media/MediaStorage';
+import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
 
-function copyImportedFile(vaultId: string, fileName: string, sourceUri: string): File {  const vaultDir = new Directory(Paths.document, 'khaznati', vaultId || 'default');
-  if (!vaultDir.exists) {
-    vaultDir.create({ intermediates: true, idempotent: true });
-  }
-  const destFile = new File(vaultDir, fileName);
-  destFile.create({ overwrite: true });
-  const srcFile = new File(sourceUri);
-  srcFile.copy(destFile);
-  return destFile;
+function getVaultDir(vaultId: string): Directory {
+  return new Directory(Paths.document, 'khaznati', vaultId || 'default');
+}
+
+function logItemActivity(action: ActivityAction, vaultId: string, itemName: string): void {
+  const repo = DIContainer.resolve<ActivityLogRepositoryImpl>('ActivityLogRepository');
+  void repo.log(action, 'item', undefined, { vaultId, name: itemName });
 }
 
 export default function FilesScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const { vaultId } = useLocalSearchParams<{ vaultId: string }>();
+  const vid = vaultId || 'default';
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,29 +49,22 @@ export default function FilesScreen(): React.JSX.Element {
     [],
   );
 
-  const getVaultDir = useCallback(() => {
-    return new Directory(Paths.document, 'khaznati', vaultId || 'default');
-  }, [vaultId]);
-
   const loadFiles = useCallback(async () => {
     try {
       setError(null);
-      const vaultDir = getVaultDir();
-      if (!vaultDir.exists) {
-        setFiles([]);
+      const result = await itemRepo.findByVaultId(vid);
+      if (!result.success) {
+        setError(result.error.message);
         return;
       }
-      const list = vaultDir.list();
-      const items: FileItem[] = list.map((entry) => {
-        const isDir = entry instanceof Directory;
-        return {
-          id: entry.uri,
-          name: entry.name,
-          type: isDir ? 'folder' : 'file',
-          size: !isDir ? (entry as File).size : undefined,
-          createdAt: (entry instanceof File ? (entry as File).modificationTime : null) ?? Date.now(),
-        };
-      });
+      const items: FileItem[] = result.data.map((it) => ({
+        id: it.encryptedPath ?? it.id,
+        dbId: it.id,
+        name: it.name,
+        type: it.type === ItemType.FOLDER ? 'folder' : 'file',
+        size: it.size,
+        createdAt: it.createdAt,
+      }));
       setFiles(items);
     } catch (err) {
       setError((err as Error).message);
@@ -77,7 +72,7 @@ export default function FilesScreen(): React.JSX.Element {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [getVaultDir]);
+  }, [itemRepo, vid]);
 
   useEffect(() => {
     loadFiles();
@@ -93,17 +88,26 @@ export default function FilesScreen(): React.JSX.Element {
       const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      const destFile = copyImportedFile(vaultId || 'default', asset.name, asset.uri);
+      const key = await getVaultKey(vid);
+      const srcFile = new File(asset.uri);
+      const base64Data = await srcFile.base64();
+      const encryptedBase64 = await encryptFile(key, base64Data);
+
+      const vaultDir = getVaultDir(vid);
+      if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
+      const encFileName = `${Date.now()}.${asset.name}.enc`;
+      const encFile = new File(vaultDir, encFileName);
+      await encFile.write(encryptedBase64);
 
       await itemRepo.create({
         id: generateId(),
-        vaultId: vaultId || 'default',
+        vaultId: vid,
         parentId: null,
         name: asset.name,
         type: ItemType.FILE,
         mimeType: asset.mimeType || null,
         size: asset.size || 0,
-        encryptedPath: destFile.uri,
+        encryptedPath: encFile.uri,
         encryptedData: null,
         thumbnailPath: null,
         metadata: null,
@@ -114,11 +118,12 @@ export default function FilesScreen(): React.JSX.Element {
         deletedAt: null,
       });
 
+      logItemActivity(ActivityAction.ADD_ITEM, vid, asset.name);
       loadFiles();
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [loadFiles, itemRepo, vaultId]);
+  }, [loadFiles, itemRepo, vid]);
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -142,13 +147,18 @@ export default function FilesScreen(): React.JSX.Element {
         text: t('common.delete'),
         style: 'destructive',
         onPress: (): void => {
-          selectedIds.forEach((id) => new File(id).delete());
+          selectedIds.forEach((id) => {
+            const item = files.find((f) => f.id === id);
+            if (item?.dbId) void itemRepo.delete(item.dbId);
+            new File(id).delete();
+            if (item) logItemActivity(ActivityAction.DELETE_ITEM, vid, item.name);
+          });
           clearSelection();
           loadFiles();
         },
       },
     ]);
-  }, [selectedIds, clearSelection, loadFiles, t]);
+  }, [selectedIds, files, clearSelection, loadFiles, itemRepo, t, vid]);
 
   const handleBatchShare = useCallback(async () => {
     const names = files.filter((f) => selectedIds.has(f.id)).map((f) => f.name).join(', ');
@@ -157,25 +167,31 @@ export default function FilesScreen(): React.JSX.Element {
 
   const handleBatchExport = useCallback(async () => {
     const selected = files.filter((f) => selectedIds.has(f.id) && f.type === 'file');
+    if (selected.length === 0) return;
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('errors.permission'));
+      Alert.alert(t('common.error'), t('errors.permissionRationale'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settings.openSettings'), onPress: () => void Linking.openSettings() },
+      ]);
       return;
     }
-    for (const item of selected) {
-      const src = new File(item.id);
-      const tempDir = new Directory(Paths.cache, 'khaznati_export');
-      if (!tempDir.exists) tempDir.create({ intermediates: true, idempotent: true });
-      const tempFile = new File(tempDir, item.name);
-      src.copy(tempFile);
+    try {
+      const key = await getVaultKey(vid);
+      for (const item of selected) {
+        const decryptedBase64 = await readAndDecryptFile(key, item.id);
+        await exportDecryptedToLibrary(item.name, decryptedBase64);
+      }
+      clearSelection();
+      Alert.alert(t('common.success'), t('files.exportSuccess'));
+    } catch (err) {
+      Alert.alert(t('common.error'), (err as Error).message);
     }
-    clearSelection();
-    Alert.alert(t('common.success'), t('files.exportSuccess'));
-  }, [selectedIds, files, clearSelection, t]);
+  }, [selectedIds, files, clearSelection, t, vid]);
 
   const handleFilePress = useCallback((item: FileItem) => {
-    router.push({ pathname: '/(app)/modals/file-preview', params: { fileName: item.name, uri: item.id } });
-  }, []);
+    router.push({ pathname: '/(app)/modals/file-preview', params: { fileName: item.name, uri: item.id, vaultId: vid } });
+  }, [vid]);
 
   const handleDeleteFile = useCallback((item: FileItem) => {
     Alert.alert(t('common.delete'), t('files.deleteConfirm', { name: item.name }), [
@@ -184,19 +200,19 @@ export default function FilesScreen(): React.JSX.Element {
         text: t('common.delete'),
         style: 'destructive',
         onPress: (): void => {
-          const file = new File(item.id);
-          file.delete();
+          if (item.dbId) void itemRepo.delete(item.dbId);
+          new File(item.id).delete();
+          logItemActivity(ActivityAction.DELETE_ITEM, vid, item.name);
           loadFiles();
         },
       },
     ]);
-  }, [loadFiles, t]);
+  }, [loadFiles, itemRepo, t, vid]);
 
   const handleRenameFile = useCallback((item: FileItem) => {
     setRenameTarget(item);
-    const oldName = item.name;
-    const extIndex = oldName.lastIndexOf('.');
-    setRenameText(extIndex > 0 ? oldName.substring(0, extIndex) : oldName);
+    const extIndex = item.name.lastIndexOf('.');
+    setRenameText(extIndex > 0 ? item.name.substring(0, extIndex) : item.name);
   }, []);
 
   const handleItemPress = useCallback((item: FileItem) => {
@@ -221,20 +237,33 @@ export default function FilesScreen(): React.JSX.Element {
 
   const submitRename = useCallback(async () => {
     if (!renameTarget || !renameText.trim()) return;
-    const vaultDir = getVaultDir();
     const oldFile = new File(renameTarget.id);
     const extIndex = renameTarget.name.lastIndexOf('.');
     const ext = extIndex > 0 ? renameTarget.name.substring(extIndex) : '';
-    const newFile = new File(vaultDir, renameText.trim() + ext);
+    const newName = renameText.trim() + ext;
+    const newEncName = `${newName}.enc`;
+    const vaultDir = getVaultDir(vid);
+    const newFile = new File(vaultDir, newEncName);
     if (newFile.exists && newFile.uri !== oldFile.uri) {
       Alert.alert(t('common.error'), t('files.nameExists'));
       return;
     }
-    oldFile.rename(renameText.trim() + ext);
+    oldFile.rename(newEncName);
+    if (renameTarget.dbId) {
+      const existing = await itemRepo.findById(renameTarget.dbId);
+      if (existing.success && existing.data) {
+        await itemRepo.update({
+          ...existing.data,
+          name: newName,
+          encryptedPath: newFile.uri,
+          updatedAt: Date.now(),
+        });
+      }
+    }
     setRenameTarget(null);
     setRenameText('');
     loadFiles();
-  }, [renameTarget, renameText, getVaultDir, loadFiles, t]);
+  }, [renameTarget, renameText, vid, loadFiles, itemRepo, t]);
 
   if (renameTarget) {
     return (
@@ -258,7 +287,7 @@ export default function FilesScreen(): React.JSX.Element {
   }
 
   return (
-    <ScreenLayout title={t('files.title')} subtitle={t('vault.itemsCount', { count: files.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
+    <ScreenLayout title={t('files.title')} subtitle={t('vault.itemsCount', { count: files.length })} showBack onBack={() => router.back()}>
       <View style={styles.flexOne}>
         <SearchBar value={search} onChangeText={setSearch} placeholder={t('files.search')} onClear={() => setSearch('')} />
         <SelectionBar

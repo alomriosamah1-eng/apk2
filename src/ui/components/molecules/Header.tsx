@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '@core/theme';
@@ -16,6 +17,7 @@ interface HeaderProps {
 
 function HeaderComponent({ title, subtitle, showBack, onBack, rightAction }: HeaderProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   return (
@@ -31,7 +33,7 @@ function HeaderComponent({ title, subtitle, showBack, onBack, rightAction }: Hea
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.backButton}
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel={t('common.goBack')}
             >
               <Icon name="arrow-left" size={24} color={colors.onBackground} />
             </TouchableOpacity>

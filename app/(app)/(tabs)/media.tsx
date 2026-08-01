@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, Share } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Alert, Share, Linking, PermissionsAndroid, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
-import { Paths, Directory, File } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
@@ -15,8 +15,8 @@ import { MediaItem } from '@ui/components/molecules/MediaThumb';
 import { MediaPreview } from '@ui/components/molecules/MediaPreview';
 import { MediaGallery } from '@ui/components/molecules/MediaGallery';
 import { useTranslation } from 'react-i18next';
-import { encryptFile, decryptFile } from '@core/utils/crypto';
-import { getVaultKey, getEncryptedDir, persistEncryptedImage } from '@data/media/MediaStorage';
+import { encryptFile } from '@core/utils/crypto';
+import { getVaultKey, getEncryptedDir, persistEncryptedImage, exportDecryptedToLibrary, readAndDecryptFile } from '@data/media/MediaStorage';
 
 export default function MediaScreen(): React.JSX.Element {
   const { colors } = useTheme();
@@ -99,8 +99,32 @@ export default function MediaScreen(): React.JSX.Element {
     await Share.share({ message: names });
   }, [selectedIds, media]);
 
+  const requestMediaPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === 'android' && (Platform.Version as number) <= 32) {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE, {
+        title: t('errors.permissionTitle'),
+        message: t('errors.permissionRationale'),
+        buttonPositive: t('settings.openSettings'),
+        buttonNegative: t('common.cancel'),
+      });
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    const { status } = await MediaLibrary.getPermissionsAsync();
+    if (status === 'granted') return true;
+    const req = await MediaLibrary.requestPermissionsAsync();
+    return req.status === 'granted';
+  }, [t]);
+
   const handleImport = useCallback(async () => {
     try {
+      const allowed = await requestMediaPermission();
+      if (!allowed) {
+        Alert.alert(t('common.error'), t('errors.permissionRationale'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('settings.openSettings'), onPress: () => void Linking.openSettings() },
+        ]);
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 1,
@@ -125,14 +149,12 @@ export default function MediaScreen(): React.JSX.Element {
     } catch (err) {
       Alert.alert(t('common.error'), (err as Error).message);
     }
-  }, [vid, loadMedia, t]);
+  }, [vid, loadMedia, t, requestMediaPermission]);
 
   const handleView = useCallback(async (item: MediaItem) => {
     try {
       const key = await getVaultKey(vid);
-      const encFile = new File(item.encryptedPath);
-      const encryptedBase64 = await encFile.text();
-      const decryptedBase64 = await decryptFile(key, encryptedBase64);
+      const decryptedBase64 = await readAndDecryptFile(key, item.encryptedPath);
       setMedia((prev) => prev.map((m) => (m.id === item.id ? { ...m, decryptedUri: `data:image/jpeg;base64,${decryptedBase64}` } : m)));
     } catch (err) {
       Alert.alert(t('common.error'), (err as Error).message);
@@ -142,23 +164,18 @@ export default function MediaScreen(): React.JSX.Element {
   const handleExport = useCallback(async (item: MediaItem) => {
     try {
       const key = await getVaultKey(vid);
-      const encFile = new File(item.encryptedPath);
-      const encryptedBase64 = await encFile.text();
-      const decryptedBase64 = await decryptFile(key, encryptedBase64);
+      const decryptedBase64 = await readAndDecryptFile(key, item.encryptedPath);
 
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('common.error'), t('errors.general'));
+        Alert.alert(t('common.error'), t('errors.permissionRationale'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('settings.openSettings'), onPress: () => void Linking.openSettings() },
+        ]);
         return;
       }
 
-      const tempDir = new Directory(Paths.cache, 'khaznati_export');
-      if (!tempDir.exists) tempDir.create({ intermediates: true, idempotent: true });
-      const tempFile = new File(tempDir, item.name);
-      await tempFile.write(decryptedBase64);
-
-      await MediaLibrary.saveToLibraryAsync(tempFile.uri);
-      tempFile.delete();
+      await exportDecryptedToLibrary(item.name, decryptedBase64);
 
       Alert.alert(t('common.success'), t('media.exportSuccess'));
     } catch (err) {

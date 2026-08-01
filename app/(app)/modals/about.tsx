@@ -182,7 +182,7 @@ export default function AboutScreen() {
               style={[styles.socialButton, { backgroundColor: '#229ED9' }]}
               onPress={handleTelegram}
               accessibilityRole="button"
-              accessibilityLabel="Telegram"
+              accessibilityLabel={t('about.telegram')}
             >
               <Icon name="send" size={16} color="#FFFFFF" />
               <Typography variant="labelMedium" color="#FFFFFF">{t('about.telegram')}</Typography>
@@ -191,7 +191,7 @@ export default function AboutScreen() {
               style={[styles.socialButton, { backgroundColor: '#25D366' }]}
               onPress={handleWhatsApp}
               accessibilityRole="button"
-              accessibilityLabel="WhatsApp"
+              accessibilityLabel={t('about.whatsapp')}
             >
               <Icon name="whatsapp" size={16} color="#FFFFFF" />
               <Typography variant="labelMedium" color="#FFFFFF">{t('about.whatsapp')}</Typography>

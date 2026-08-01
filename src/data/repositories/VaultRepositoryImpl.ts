@@ -17,11 +17,11 @@ export class VaultRepositoryImpl implements IVaultRepository {
       const dto = this.mapper.toDTO(vault);
       await this.db.executeSql(
         `INSERT INTO vaults (id, name, type, icon, color, created_at, updated_at, 
-         last_accessed_at, is_locked, encrypted_pin_hash, pin_salt, failed_attempts, locked_until, item_count, total_size, backup_version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         last_accessed_at, is_locked, encrypted_pin_hash, pin_salt, failed_attempts, locked_until, item_count, total_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [dto.id, dto.name, dto.type, dto.icon, dto.color, dto.created_at, dto.updated_at,
          dto.last_accessed_at, dto.is_locked, dto.encrypted_pin_hash, dto.pin_salt,
-         dto.failed_attempts, dto.locked_until, dto.item_count, dto.total_size, dto.backup_version],
+         dto.failed_attempts, dto.locked_until, dto.item_count, dto.total_size],
       );
       return success(vault);
     } catch (error) {
@@ -29,7 +29,7 @@ export class VaultRepositoryImpl implements IVaultRepository {
     }
   }
 
-  private readonly VAULT_COLUMNS = 'id, name, type, icon, color, created_at, updated_at, last_accessed_at, is_locked, encrypted_pin_hash, pin_salt, failed_attempts, locked_until, item_count, total_size, backup_version';
+  private readonly VAULT_COLUMNS = 'id, name, type, icon, color, created_at, updated_at, last_accessed_at, is_locked, encrypted_pin_hash, pin_salt, failed_attempts, locked_until, item_count, total_size';
 
   /** Finds a vault by its ID, or null if not found. */
   async findById(id: string): Promise<Result<Vault | null>> {
@@ -57,10 +57,11 @@ export class VaultRepositoryImpl implements IVaultRepository {
       const dto = this.mapper.toDTO(vault);
       await this.db.executeSql(
         `UPDATE vaults SET name = ?, type = ?, icon = ?, color = ?, updated_at = ?, 
-         last_accessed_at = ?, is_locked = ?, failed_attempts = ?, locked_until = ?, item_count = ?, total_size = ?
+         last_accessed_at = ?, is_locked = ?, encrypted_pin_hash = ?, pin_salt = ?, failed_attempts = ?, locked_until = ?, item_count = ?, total_size = ?
          WHERE id = ?`,
         [dto.name, dto.type, dto.icon, dto.color, dto.updated_at, dto.last_accessed_at,
-         dto.is_locked, dto.failed_attempts, dto.locked_until, dto.item_count, dto.total_size, dto.id],
+         dto.is_locked, dto.encrypted_pin_hash, dto.pin_salt, dto.failed_attempts,
+         dto.locked_until, dto.item_count, dto.total_size, dto.id],
       );
       return success(vault);
     } catch (error) {

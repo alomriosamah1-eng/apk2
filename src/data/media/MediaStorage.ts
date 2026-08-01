@@ -1,10 +1,11 @@
 import { Paths, Directory, File } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { DIContainer } from '@core/di/container';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 import { IItemRepository } from '@domain/repositories/IItemRepository';
 import { ItemType } from '@core/constants';
 import { generateId } from '@core/utils';
-import { generateEncryptionKey } from '@core/utils/crypto';
+import { generateEncryptionKey, decryptFile } from '@core/utils/crypto';
 
 export async function getVaultKey(vaultId: string): Promise<string> {
   const storage = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
@@ -56,4 +57,24 @@ export async function persistEncryptedImage({ vaultId, name, mimeType, size, enc
     updatedAt: Date.now(),
     deletedAt: null,
   });
+}
+
+/** Exports a decrypted file to the OS photo library, then deletes the temp copy (no plaintext leftovers). */
+export async function exportDecryptedToLibrary(fileName: string, decryptedBase64: string): Promise<void> {
+  const tempDir = new Directory(Paths.cache, 'khaznati_export');
+  if (!tempDir.exists) tempDir.create({ intermediates: true, idempotent: true });
+  const tempFile = new File(tempDir, fileName);
+  await tempFile.write(decryptedBase64);
+  try {
+    await MediaLibrary.saveToLibraryAsync(tempFile.uri);
+  } finally {
+    try { tempFile.delete(); } catch { /* best-effort cleanup */ }
+  }
+}
+
+/** Reads + decrypts an encrypted `.enc` file from disk. */
+export async function readAndDecryptFile(key: string, encryptedUri: string): Promise<string> {
+  const src = new File(encryptedUri);
+  const encryptedBase64 = await src.text();
+  return decryptFile(key, encryptedBase64);
 }

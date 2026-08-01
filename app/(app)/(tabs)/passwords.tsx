@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, StyleSheet, RefreshControl, TouchableOpacity, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
+import { APP_CONFIG } from '@core/constants/config';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
 import { Typography } from '@ui/components/atoms/Typography';
 import { EmptyState } from '@ui/components/atoms/EmptyState';
@@ -20,14 +21,23 @@ import { DIContainer } from '@core/di/container';
 import { IPasswordRepository } from '@domain/repositories/IPasswordRepository';
 import { PasswordEntry } from '@domain/entities/Password';
 import { generateId } from '@core/utils';
+import { scheduleClipboardClear } from '@core/utils/clipboard';
+import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
+import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
+import { ActivityAction } from '@core/constants';
 
 const CATEGORIES = ['social', 'email', 'finance', 'shopping', 'work', 'entertainment', 'other'];
+
+function logPasswordActivity(action: ActivityAction, vaultId: string, serviceName: string): void {
+  const repo = DIContainer.resolve<ActivityLogRepositoryImpl>('ActivityLogRepository');
+  void repo.log(action, 'password', undefined, { vaultId, name: serviceName });
+}
 
 export default function PasswordsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { vaultId: paramsVaultId } = useLocalSearchParams<{ vaultId: string }>();
-  const vaultId = paramsVaultId || '';
+  const vaultId = paramsVaultId || 'default';
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,6 +51,22 @@ export default function PasswordsScreen() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelecting, setIsSelecting] = useState(false);
+  const [clipboardProtection, setClipboardProtection] = useState(true);
+  const clipboardCleanup = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    const secureStorage = new SecureStorageSource();
+    secureStorage.get('clipboard_protection').then((value) => {
+      setClipboardProtection(value !== 'false');
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clipboardCleanup.current();
+      clipboardCleanup.current = () => {};
+    };
+  }, []);
 
   const repo = useMemo(
     () => DIContainer.resolve<IPasswordRepository>('PasswordRepository'),
@@ -110,6 +136,11 @@ export default function PasswordsScreen() {
 
     if (result?.success) {
       await loadEntries();
+      logPasswordActivity(
+        editingId ? ActivityAction.EDIT_PASSWORD : ActivityAction.ADD_PASSWORD,
+        vaultId,
+        formData.serviceName,
+      );
     }
     setShowForm(false);
     setEditingId(null);
@@ -130,17 +161,25 @@ export default function PasswordsScreen() {
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {
+    const entry = entries.find((e) => e.id === id);
     const result = await repo.delete(id);
     if (result.success) {
+      if (entry) logPasswordActivity(ActivityAction.DELETE_PASSWORD, vaultId, entry.serviceName);
       await loadEntries();
     }
-  }, [repo, loadEntries]);
+  }, [repo, loadEntries, entries, vaultId]);
 
   const handleCopy = useCallback(async (text: string, field: string) => {
     await Clipboard.setStringAsync(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
-  }, []);
+    clipboardCleanup.current();
+    clipboardCleanup.current = scheduleClipboardClear(
+      (value) => void Clipboard.setStringAsync(value),
+      clipboardProtection,
+      APP_CONFIG.security.clipboardClearMs,
+    );
+  }, [clipboardProtection]);
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -205,7 +244,7 @@ export default function PasswordsScreen() {
               <Icon name="auto-fix" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
-          <Input label={t('passwords.notes')} value={formData.notes} onChangeText={(t) => setFormData((p) => ({ ...p, notes: t }))} placeholder="Additional notes" />
+          <Input label={t('passwords.notes')} value={formData.notes} onChangeText={(t) => setFormData((p) => ({ ...p, notes: t }))} placeholder={t('passwords.notesPlaceholder')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
@@ -234,7 +273,7 @@ export default function PasswordsScreen() {
   }
 
   return (
-    <ScreenLayout title={t('passwords.title')} subtitle={t('passwords.savedCount', { count: entries.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
+    <ScreenLayout title={t('passwords.title')} subtitle={t('passwords.savedCount', { count: entries.length })} showBack onBack={() => router.back()}>
       <SearchBar value={search} onChangeText={setSearch} placeholder={t('passwords.search')} onClear={() => setSearch('')} />
       {isSelecting && (
         <SelectionBar

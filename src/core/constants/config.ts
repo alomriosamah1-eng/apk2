@@ -1,7 +1,7 @@
 /** Application-wide configuration constants. */
 export const APP_CONFIG = {
   name: 'Khaznati',
-  version: '1.0.0',
+  version: '1.1.0',
   buildNumber: 1,
   packageName: 'com.khaznati.vault',
 
@@ -34,12 +34,5 @@ export const APP_CONFIG = {
     thumbnailCacheDays: 30,
     maxFileSize: 500 * 1024 * 1024,
     chunkSize: 1024 * 1024,
-  },
-
-  /** Backup file format configuration. */
-  backup: {
-    fileExtension: '.kzb',
-    magicHeader: 'KHAZNAti',
-    currentVersion: 1,
   },
 } as const;

@@ -28,7 +28,14 @@
     "on": "On",
     "off": "Off",
     "add": "Add",
-    "share": "Share"
+    "share": "Share",
+    "rename": "Rename",
+    "reload": "Reload",
+    "clearSelection": "Clear selection",
+    "goBack": "Go back",
+    "input": "Input",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "auth": {
     "welcome": "Welcome to Khaznati",
@@ -65,7 +72,8 @@
     "selectColor": "Choose Color",
     "faceId": "Face ID",
     "iconA11y": "Icon {{name}}",
-    "colorA11y": "Color {{hex}}"
+    "colorA11y": "Color {{hex}}",
+    "biometric": "Biometric Unlock"
   },
   "vault": {
     "title": "Vaults",
@@ -89,8 +97,8 @@
       "secureStorageDesc": "Encrypt and protect your sensitive files",
       "biometricLock": "Biometric Lock",
       "biometricLockDesc": "Unlock with your fingerprint or face",
-      "backup": "Backup",
-      "backupDesc": "Never lose your data with encrypted backups"
+      "offlineFirst": "Offline & Private",
+      "offlineFirstDesc": "Everything stays on your device, never in the cloud"
     }
   },
   "files": {
@@ -120,7 +128,9 @@
     "dateCreated": "Date Created",
     "export": "Export to device",
     "exportSuccess": "Files exported successfully",
-    "deleteConfirm": "Delete {{name}}?"
+    "deleteConfirm": "Delete {{name}}?",
+    "nameExists": "A file with this name already exists",
+    "namePlaceholder": "Enter a new name"
   },
   "media": {
     "title": "Media",
@@ -131,7 +141,8 @@
     "emptyDesc": "Add photos and videos to your vault",
     "export": "Export to Gallery",
     "exportSuccess": "Photo exported to gallery",
-    "deleteConfirm": "Delete this photo?"
+    "deleteConfirm": "Delete this photo?",
+    "search": "Search media"
   },
   "notes": {
     "title": "Notes",
@@ -147,8 +158,10 @@
     "unpin": "Unpin",
     "pin": "Pin",
     "search": "Search notes",
-    "untitled": "Untitled",
-    "noContent": "No content"
+ "untitled": "Untitled",
+ "noContent": "No content",
+ "manyNotes_one": "{{count}} note",
+ "manyNotes_other": "{{count}} notes"
   },
   "passwords": {
     "title": "Passwords",
@@ -164,6 +177,7 @@
     "usernamePlaceholder": "Enter username",
     "password": "Password",
     "passwordPlaceholder": "Enter password",
+    "notesPlaceholder": "Additional notes",
     "category": "Category",
     "notes": "Notes",
     "strength": "Password Strength",
@@ -219,11 +233,6 @@
     "storage": "Storage",
     "storageUsed": "Storage Used",
     "storageFree": "Storage Free",
-    "backup": "Backup",
-    "autoBackup": "Auto Backup",
-    "backupInterval": "Backup Interval",
-    "createBackup": "Create Backup",
-    "restoreBackup": "Restore Backup",
     "about": "About",
     "version": "Version",
     "licenses": "Licenses",
@@ -237,21 +246,21 @@
     "after15min": "After 15 minutes",
     "after30min": "After 30 minutes",
     "thumbnailQuality": "Thumbnail Quality",
-    "backupDialogTitle": "Create Backup",
-    "backupDialogMessage": "Backup saved to:\n{{path}}",
-    "noDatabaseBackup": "No database found to backup",
     "aboutDialog": "Version 1.0.0\n\nA secure, encrypted vault for your digital life.\n\nBuilt with Expo and React Native.",
     "licensesDialog": "This app uses open-source software:\n\n• Expo\n• React Native\n• SQLite\n• Various MIT-licensed packages",
     "autoLockDialogTitle": "Auto Lock",
     "autoLockDialogMessage": "Choose when to auto-lock your vaults",
     "biometricAuthPrompt": "Authenticate to toggle biometrics",
+    "languageRestart": "The language will change after the app restarts",
     "low": "Low",
-    "medium": "Medium",
-    "high": "High"
+ "medium": "Medium",
+ "high": "High",
+ "openSettings": "Open Settings"
   },
   "errors": {
     "general": "An unexpected error occurred",
     "network": "Network connection error",
+    "boundaryTitle": "Something went wrong",
     "database": "Database error",
     "authentication": "Authentication failed",
     "biometricNotAvailable": "Biometrics not available on this device",
@@ -266,9 +275,9 @@
     "vaultLocked": "Vault is locked",
     "exportFailed": "Export failed",
     "importFailed": "Import failed",
-    "backupFailed": "Backup creation failed",
-    "restoreFailed": "Backup restoration failed",
-    "permission": "Permission required"
+    "permission": "Permission required",
+ "permissionTitle": "Permission Needed",
+ "permissionRationale": "Khaznati needs access to your photo library and media files to import and export items. Please enable permission in Settings."
   },
   "about": {
     "title": "About Us",
@@ -318,10 +327,7 @@
   "notifications": {
     "title": "Notifications",
     "empty": "No notifications",
-    "vaultLocked": "Vault locked",
-    "backupComplete": "Backup created successfully",
-    "backupFailed": "Backup failed",
-    "syncComplete": "Sync completed successfully"
+    "vaultLocked": "Vault locked"
   },
   "time": {
     "now": "now",

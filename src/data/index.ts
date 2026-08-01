@@ -4,6 +4,5 @@ export { ItemRepositoryImpl } from './repositories/ItemRepositoryImpl';
 export { NoteRepositoryImpl } from './repositories/NoteRepositoryImpl';
 export { PasswordRepositoryImpl } from './repositories/PasswordRepositoryImpl';
 export { ActivityLogRepositoryImpl } from './repositories/ActivityLogRepositoryImpl';
-export { SettingsRepositoryImpl } from './repositories/SettingsRepositoryImpl';
 export { SecureStorageSource } from './datasources/SecureStorageSource';
 export { FileSystemSource } from './datasources/FileSystemSource';

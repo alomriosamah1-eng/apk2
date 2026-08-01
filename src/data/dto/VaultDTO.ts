@@ -15,5 +15,4 @@ export interface VaultDTO {
   locked_until: number | null;
   item_count: number;
   total_size: number;
-  backup_version: number;
 }

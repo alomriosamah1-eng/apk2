@@ -19,3 +19,5 @@ ios/
 .expo-shared/
 coverage/
 .husky/
+khaznati-release/
+*.zip

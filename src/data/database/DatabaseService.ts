@@ -5,11 +5,24 @@ import { now, logger, withRetry } from '@core/utils';
 import { generateEncryptionKey } from '@core/utils/crypto';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 
+/** Database-at-rest encryption state (Recovery/09 §3, R3). */
+export enum DatabaseEncryptionState {
+  /** Full-file SQLCipher-style encryption is active. */
+  ENCRYPTED = 'encrypted',
+  /** Driver does not support whole-file encryption (expo-sqlite); field-level is used instead. */
+  FIELD_ENCRYPTED = 'field-encrypted',
+  /** No encryption surface at the DB layer; secrets rely on field-level crypto. */
+  PLAINTEXT = 'plaintext',
+  /** State not yet determined. */
+  UNKNOWN = 'unknown',
+}
+
 /** Service managing the SQLite database connection, queries, transactions, and backups. */
 export class DatabaseService {
   private db: SQLiteDatabase | null = null;
   private initialized = false;
   private dbPath: string | null = null;
+  private encryptionState: DatabaseEncryptionState = DatabaseEncryptionState.UNKNOWN;
 
   /** Opens the database and applies initial PRAGMA settings. */
   async initialize(password?: string): Promise<void> {
@@ -28,10 +41,24 @@ export class DatabaseService {
       }
     }
 
+    this.encryptionState = DatabaseEncryptionState.UNKNOWN;
     try {
       this.db.runSync('PRAGMA key = ?', [password]);
+      // SQLCipher silently accepts unknown PRAGMAs in some builds; we only trust
+      // the state if a real cipher mode is reported.
+      const cipher = this.db.getFirstSync<{ cipher: string | null }>(
+        'PRAGMA cipher_version',
+      );
+      this.encryptionState = cipher
+        ? DatabaseEncryptionState.ENCRYPTED
+        : DatabaseEncryptionState.PLAINTEXT;
     } catch {
-      logger.warn('Database encryption not supported on this platform, continuing without PRAGMA key');
+      // expo-sqlite does not ship SQLCipher: whole-file encryption is unsupported.
+      this.encryptionState = DatabaseEncryptionState.FIELD_ENCRYPTED;
+      logger.warn(
+        'Database whole-file encryption is NOT supported by expo-sqlite. ' +
+        'Secrets rely on field-level AES-256-GCM encryption. See Recovery/09 §3 (R3).',
+      );
     }
 
     this.db.execSync('PRAGMA journal_mode = WAL');
@@ -41,7 +68,15 @@ export class DatabaseService {
     this.db.execSync('PRAGMA foreign_keys = ON');
 
     this.initialized = true;
-    logger.info('Database initialized', { latencyMs: Date.now() - start });
+    logger.info('Database initialized', {
+      latencyMs: Date.now() - start,
+      encryptionState: this.encryptionState,
+    });
+  }
+
+  /** Returns the resolved at-rest encryption state of the database. */
+  getEncryptionState(): DatabaseEncryptionState {
+    return this.encryptionState;
   }
 
   private ensureInitialized(): void {
@@ -123,39 +158,6 @@ export class DatabaseService {
       logger.error('Integrity check error', error as Error);
       return false;
     }
-  }
-
-  /** Copies the database file to a destination directory and returns the backup path. */
-  async backup(destinationDir: string): Promise<string> {
-    const sourcePath = this.getDatabasePath();
-    if (!sourcePath) throw new Error('Cannot determine database path');
-
-    const info = await FileSystem.getInfoAsync(sourcePath);
-    if (!info.exists) throw new Error(`Database file not found at ${sourcePath}`);
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `khaznati-backup-${timestamp}.kzb`;
-    const destPath = `${destinationDir}/${fileName}`;
-
-    await FileSystem.makeDirectoryAsync(destinationDir, { intermediates: true });
-    await FileSystem.copyAsync({ from: sourcePath, to: destPath });
-    logger.info('Database backup completed', { destination: destPath, size: info.size });
-
-    return destPath;
-  }
-
-  /** Restores the database from a backup file. */
-  async restore(sourcePath: string): Promise<void> {
-    const info = await FileSystem.getInfoAsync(sourcePath);
-    if (!info.exists) throw new Error(`Backup file not found at ${sourcePath}`);
-
-    const destPath = this.getDatabasePath();
-    if (!destPath) throw new Error('Cannot determine database path');
-
-    await this.close();
-    await FileSystem.copyAsync({ from: sourcePath, to: destPath });
-    await this.initialize();
-    logger.info('Database restored from backup', { source: sourcePath });
   }
 
   /** Returns the current timestamp from the shared time utility. */

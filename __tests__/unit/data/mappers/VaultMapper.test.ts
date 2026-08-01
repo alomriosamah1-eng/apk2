@@ -21,7 +21,6 @@ describe('VaultMapper', () => {
     lockedUntil: null,
     itemCount: 5,
     totalSize: 1000,
-    backupVersion: 1,
   };
 
   it('maps entity to DTO and back', () => {

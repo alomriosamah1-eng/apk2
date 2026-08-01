@@ -22,7 +22,6 @@ export class VaultMapper {
       lockedUntil: dto.locked_until,
       itemCount: dto.item_count,
       totalSize: dto.total_size,
-      backupVersion: dto.backup_version,
     };
   }
 
@@ -44,7 +43,6 @@ export class VaultMapper {
       locked_until: entity.lockedUntil,
       item_count: entity.itemCount,
       total_size: entity.totalSize,
-      backup_version: entity.backupVersion,
     };
   }
 }

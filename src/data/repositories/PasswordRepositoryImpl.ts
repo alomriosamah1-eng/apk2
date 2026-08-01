@@ -4,7 +4,7 @@ import { Result, success, failure, DatabaseError } from '@core/errors';
 import { PasswordDTO } from '@data/dto/PasswordDTO';
 import { PasswordMapper } from '@data/mappers/PasswordMapper';
 import { DatabaseService } from '@data/database/DatabaseService';
-import { encryptData, decryptData, generateEncryptionKey } from '@core/utils/crypto';
+import { encryptData, decryptData, generateEncryptionKey, CryptoError } from '@core/utils/crypto';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 
 export class PasswordRepositoryImpl implements IPasswordRepository {
@@ -52,11 +52,14 @@ export class PasswordRepositoryImpl implements IPasswordRepository {
       try {
         const vaultKey = await this.getVaultKey(entry.vaultId);
         entry.encryptedPassword = await decryptData(vaultKey, row.encrypted_password);
-      } catch {
-        entry.encryptedPassword = '[encrypted]';
+      } catch (error) {
+        if (error instanceof CryptoError) throw error;
       }
       return success(entry);
     } catch (error) {
+      if (error instanceof CryptoError) {
+        return failure(error);
+      }
       return failure(new DatabaseError('Failed to find password', (error as Error).message));
     }
   }
@@ -72,13 +75,16 @@ export class PasswordRepositoryImpl implements IPasswordRepository {
         const entry = this.mapper.toEntity(r);
         try {
           entry.encryptedPassword = await decryptData(vaultKey, r.encrypted_password);
-        } catch {
-          entry.encryptedPassword = '[encrypted]';
+        } catch (error) {
+          if (error instanceof CryptoError) throw error;
         }
         return entry;
       }));
       return success(entries);
     } catch (error) {
+      if (error instanceof CryptoError) {
+        return failure(error);
+      }
       return failure(new DatabaseError('Failed to find passwords', (error as Error).message));
     }
   }

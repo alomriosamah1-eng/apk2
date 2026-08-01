@@ -44,7 +44,7 @@ function WelcomeScreenContent() {
         <View style={[styles.features, { paddingHorizontal: spacing.xl }]}>
           <FeatureItem icon="shield-lock" title={t('welcome.features.secureStorage')} description={t('welcome.features.secureStorageDesc')} />
           <FeatureItem icon="fingerprint" title={t('welcome.features.biometricLock')} description={t('welcome.features.biometricLockDesc')} />
-          <FeatureItem icon="sync" title={t('welcome.features.backup')} description={t('welcome.features.backupDesc')} />
+          <FeatureItem icon="eye-off" title={t('welcome.features.offlineFirst')} description={t('welcome.features.offlineFirstDesc')} />
         </View>
 
         <View style={[styles.actions, { paddingHorizontal: spacing.xl }]}>

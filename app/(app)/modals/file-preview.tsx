@@ -11,18 +11,21 @@ import { Icon } from '@ui/components/atoms/Icon';
 import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { spacing } from '@core/theme';
+import { decryptFile } from '@core/utils/crypto';
+import { getVaultKey } from '@data/media/MediaStorage';
 
 const TEXT_EXTENSIONS = ['.txt', '.md', '.json', '.xml', '.html', '.csv', '.log', '.yml', '.yaml', '.ini', '.cfg'];
 
 export default function FilePreviewModal() {
-  const { colors } = useTheme();
   const { t } = useTranslation();
-  const { fileName, uri } = useLocalSearchParams<{ fileName: string; uri: string; type: string }>();
+  const { fileName, uri, vaultId } = useLocalSearchParams<{ fileName: string; uri: string; type: string; vaultId: string }>();
+  const vid = vaultId || 'default';
   const ext = fileName ? `.${fileName.split('.').pop()?.toLowerCase()}` : '';
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext.replace('.', ''));
   const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext.replace('.', ''));
   const isText = TEXT_EXTENSIONS.includes(ext);
   const [textContent, setTextContent] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string>('');
@@ -46,9 +49,14 @@ export default function FilePreviewModal() {
           const kb = sizeNum / 1024;
           setFileSize(kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb.toFixed(1)} KB`);
         }
+        const key = await getVaultKey(vid);
+        const encryptedBase64 = await file.text();
+        const decryptedBase64 = await decryptFile(key, encryptedBase64);
         if (isText) {
-          const content = await file.text();
+          const content = decodeBase64Utf8(decryptedBase64);
           setTextContent(content);
+        } else if (isImage) {
+          setImageUri(`data:image/jpeg;base64,${decryptedBase64}`);
         }
       } catch (err) {
         setError((err as Error).message);
@@ -56,11 +64,59 @@ export default function FilePreviewModal() {
         setLoading(false);
       }
     })();
-  }, [uri, isText]);
+  }, [uri, isText, isImage, vid, t]);
+
+  return (
+    <FilePreviewView
+      fileName={fileName}
+      uri={uri}
+      isImage={isImage}
+      isVideo={isVideo}
+      isText={isText}
+      textContent={textContent}
+      imageUri={imageUri}
+      loading={loading}
+      error={error}
+      fileSize={fileSize}
+      onBack={() => router.back()}
+      onErrorRetry={() => router.back()}
+      t={t}
+    />
+  );
+}
+
+function decodeBase64Utf8(base64: string): string {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+}
+
+interface PreviewViewProps {
+  fileName?: string;
+  uri?: string;
+  isImage: boolean;
+  isVideo: boolean;
+  isText: boolean;
+  textContent: string | null;
+  imageUri: string | null;
+  loading: boolean;
+  error: string | null;
+  fileSize: string;
+  onBack: () => void;
+  onErrorRetry: () => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}
+
+function FilePreviewView({
+  fileName, uri, isImage, isVideo, isText, textContent, imageUri, loading, error, fileSize, onBack, onErrorRetry, t,
+}: PreviewViewProps) {
+  const { colors } = useTheme();
+  const ext = fileName ? `.${fileName.split('.').pop()?.toLowerCase()}` : '';
 
   if (!uri) {
     return (
-        <ScreenLayout title={t('files.preview')} showBack onBack={() => router.back()}>
+      <ScreenLayout title={t('files.preview')} showBack onBack={onBack}>
         <View style={styles.center}>
           <Icon name="file-question-outline" size={64} color={colors.onSurfaceVariant} />
           <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>{t('files.noFileSelected')}</Typography>
@@ -74,14 +130,21 @@ export default function FilePreviewModal() {
   }
 
   if (error && !isImage && !isVideo) {
-    return <ErrorView message={error} onRetry={() => router.back()} />;
+    return <ErrorView message={error} onRetry={onErrorRetry} />;
   }
 
   return (
-    <ScreenLayout title={fileName || t('files.preview')} showBack onBack={() => router.back()}>
+    <ScreenLayout title={fileName || t('files.preview')} showBack onBack={onBack}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {isImage ? (
-          <Image source={{ uri }} style={styles.image} contentFit="contain" accessibilityLabel={fileName} />
+          imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.image} contentFit="contain" accessibilityLabel={fileName} />
+          ) : (
+            <View style={styles.center}>
+              <Icon name="file-image-outline" size={64} color={colors.onSurfaceVariant} />
+              <Typography variant="bodyLarge" color={colors.error} style={styles.text}>{error || t('common.error')}</Typography>
+            </View>
+          )
         ) : isVideo ? (
           <View style={[styles.videoPlaceholder, { backgroundColor: colors.surfaceVariant }]}>
             <Icon name="video-outline" size={64} color={colors.onSurfaceVariant} />
@@ -98,7 +161,7 @@ export default function FilePreviewModal() {
           <View style={styles.center}>
             <Icon name="file-outline" size={64} color={colors.onSurfaceVariant} />
             <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.text}>
-                {ext ? t('files.fileType', { ext: ext.toUpperCase() }) : 'File'}
+              {ext ? t('files.fileType', { ext: ext.toUpperCase() }) : 'File'}
             </Typography>
             {fileSize && <Typography variant="bodySmall" color={colors.onSurfaceVariant}>{fileSize}</Typography>}
             {error && <Typography variant="bodySmall" color={colors.error} style={styles.text}>{error}</Typography>}

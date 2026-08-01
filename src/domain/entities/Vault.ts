@@ -32,6 +32,4 @@ export interface Vault {
   itemCount: number;
   /** Total size (bytes) of vault contents. */
   totalSize: number;
-  /** Version number for backup tracking. */
-  backupVersion: number;
 }

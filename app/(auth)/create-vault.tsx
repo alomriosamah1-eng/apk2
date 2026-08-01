@@ -10,6 +10,7 @@ import { Input } from '@ui/components/atoms/Input';
 import { Icon } from '@ui/components/atoms/Icon';
 import { VaultType } from '@core/constants';
 import { useVaults } from '@ui/hooks/useVaults';
+import { useSession } from '@ui/providers/SessionProvider';
 import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
 import { DIContainer } from '@core/di/container';
 
@@ -29,6 +30,7 @@ export default function CreateVaultScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { createVault } = useVaults();
+  const { unlock } = useSession();
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -66,7 +68,8 @@ export default function CreateVaultScreen() {
       if (result.success) {
         const biometricUseCase = DIContainer.resolve<BiometricUnlockUseCase>('BiometricUnlockUseCase');
         await biometricUseCase.storeBiometricPin(result.data.id, pin);
-        router.replace('/(app)/(tabs)/vault');
+        unlock(result.data.id);
+        router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: result.data.id } });
       } else {
         setError(result.error.message);
       }
@@ -75,7 +78,7 @@ export default function CreateVaultScreen() {
     } finally {
       setLoading(false);
     }
-  }, [name, pin, confirmPin, createVault]);
+  }, [name, pin, confirmPin, createVault, unlock]);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>

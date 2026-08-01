@@ -15,8 +15,7 @@ CREATE TABLE IF NOT EXISTS vaults (
     failed_attempts INTEGER DEFAULT 0,
     locked_until INTEGER,
     item_count INTEGER DEFAULT 0,
-    total_size INTEGER DEFAULT 0,
-    backup_version INTEGER DEFAULT 0
+    total_size INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS items (
@@ -77,21 +76,6 @@ CREATE TABLE IF NOT EXISTS activity_log (
     metadata_json TEXT,
     created_at INTEGER NOT NULL,
     FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL,
-    updated_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS backup_metadata (
-    id TEXT PRIMARY KEY NOT NULL,
-    version INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    file_size INTEGER,
-    checksum TEXT,
-    is_encrypted INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_vault_id ON items(vault_id);

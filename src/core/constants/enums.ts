@@ -63,8 +63,6 @@ export enum ActivityAction {
   DELETE_PASSWORD = 'delete_password',
   LOGIN = 'login',
   LOGIN_FAILED = 'login_failed',
-  BACKUP_CREATED = 'backup_created',
-  BACKUP_RESTORED = 'backup_restored',
   SETTINGS_CHANGED = 'settings_changed',
 }
 

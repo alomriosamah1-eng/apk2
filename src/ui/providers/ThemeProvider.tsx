@@ -1,8 +1,12 @@
-import { createContext, useContext, useState, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, useEffect, useCallback, ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 import { lightColors, darkColors, amoledColors, ThemeColors } from '@core/theme';
 import { ThemeMode } from '@core/constants';
 import { getStateLayers, StateLayer } from '@core/theme/state';
+import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
+
+const THEME_KEY = 'theme_mode';
+const secureStorage = new SecureStorageSource();
 
 interface ThemeContextValue {
   colors: ThemeColors;
@@ -22,6 +26,19 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeMode] = useState<ThemeMode>(ThemeMode.SYSTEM);
+
+  useEffect(() => {
+    secureStorage.get(THEME_KEY).then((stored) => {
+      if (stored && (Object.values(ThemeMode) as string[]).includes(stored)) {
+        setThemeMode(stored as ThemeMode);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const persistThemeMode = useCallback((mode: ThemeMode) => {
+    setThemeMode(mode);
+    secureStorage.set(THEME_KEY, mode).catch(() => {});
+  }, []);
 
   const mode = useMemo(() => {
     if (themeMode === ThemeMode.SYSTEM) {
@@ -46,9 +63,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     colors: colors as ThemeColors,
     mode,
     isDark,
-    setThemeMode: setThemeMode as (mode: ThemeMode) => void,
+    setThemeMode: persistThemeMode,
     stateLayers,
-  }), [colors, mode, isDark, stateLayers]);
+  }), [colors, mode, isDark, persistThemeMode, stateLayers]);
 
   return (
     <ThemeContext.Provider value={value}>

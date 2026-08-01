@@ -1,8 +1,7 @@
-import { useState, useCallback, memo, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, I18nManager } from 'react-native';
+import { useState, useCallback, memo, useMemo, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { Paths, Directory, File } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { Paths, Directory } from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { ThemeMode } from '@core/constants/enums';
@@ -15,11 +14,9 @@ import { Divider } from '@ui/components/atoms/Divider';
 import { useBiometrics } from '@ui/hooks/useBiometrics';
 import { useSecureStorage } from '@ui/hooks/useSecureStorage';
 import { useVaults } from '@ui/hooks/useVaults';
+import { useSession } from '@ui/providers/SessionProvider';
 import { changeLanguage, getCurrentLanguage } from '@core/i18n';
-import * as DocumentPicker from 'expo-document-picker';
 import * as Updates from 'expo-updates';
-import { DIContainer } from '@core/di/container';
-import { DatabaseService } from '@data/database/DatabaseService';
 
 function ToggleSwitch({ value, onValueChange, disabled }: { value: boolean; onValueChange: () => void; disabled?: boolean }) {
   const { colors } = useTheme();
@@ -53,13 +50,34 @@ function ToggleSwitch({ value, onValueChange, disabled }: { value: boolean; onVa
 function SettingsScreenContent() {
   const { colors, mode, setThemeMode } = useTheme();
   const { isAvailable: bioAvailable, isEnrolled: bioEnrolled, authenticate, biometryType } = useBiometrics();
-  const { setItem } = useSecureStorage();
+  const { setItem, getItem } = useSecureStorage();
   const { vaults, deleteVault, lockVault } = useVaults();
   const { t } = useTranslation();
+  const { lock: lockSession } = useSession();
   const [bioEnabled, setBioEnabled] = useState(false);
   const [clipboardProtection, setClipboardProtection] = useState(true);
   const [autoLockValue, setAutoLockValue] = useState(300000);
   const [currentLang, setCurrentLang] = useState<'ar' | 'en'>(getCurrentLanguage());
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const bio = await getItem('biometric_enabled');
+        if (bio !== null) setBioEnabled(bio === 'true');
+
+        const clipboard = await getItem('clipboard_protection');
+        if (clipboard !== null) setClipboardProtection(clipboard === 'true');
+
+        const autoLock = await getItem('auto_lock_timeout');
+        if (autoLock !== null) {
+          const parsed = Number(autoLock);
+          if (!Number.isNaN(parsed)) setAutoLockValue(parsed);
+        }
+      } catch {
+        // Keep defaults if storage is unavailable.
+      }
+    })();
+  }, [getItem]);
 
   const AUTO_LOCK_OPTIONS = useMemo(() => [
     { label: t('settings.immediately'), value: 0 },
@@ -117,80 +135,10 @@ function SettingsScreenContent() {
     const next = currentLang === 'ar' ? 'en' : 'ar';
     changeLanguage(next);
     setCurrentLang(next);
-    I18nManager.forceRTL(next === 'ar');
     Alert.alert(t('settings.language'), t('settings.languageRestart'), [
       { text: t('common.ok'), onPress: () => Updates.reloadAsync() },
     ]);
   }, [currentLang, t]);
-
-  const handleBackup = useCallback(async () => {
-    try {
-      const backupDir = new Directory(Paths.document, 'backups');
-      if (!backupDir.exists) {
-        backupDir.create({ intermediates: true });
-      }
-
-      const timestamp = Date.now();
-      const backupPath = `${backupDir.uri}/khaznati-backup-${timestamp}.kzb`;
-
-      const dbPath = new Directory(Paths.document, 'SQLite');
-      if (dbPath.exists) {
-        const dbFile = new File(dbPath, 'khaznati.db');
-        if (dbFile.exists) {
-          const destFile = new File(backupDir, `khaznati-backup-${timestamp}.kzb`);
-          destFile.create({ overwrite: true });
-          dbFile.copy(destFile);
-
-          const canShare = await Sharing.isAvailableAsync();
-          if (canShare) {
-            await Sharing.shareAsync(destFile.uri, {
-              mimeType: 'application/octet-stream',
-              dialogTitle: t('settings.backup'),
-            });
-          } else {
-            Alert.alert(t('settings.backupDialogTitle'), t('settings.backupDialogMessage', { path: backupPath }));
-          }
-          return;
-        }
-      }
-      Alert.alert(t('common.error'), t('settings.noDatabaseBackup'));
-    } catch (err) {
-      Alert.alert(t('errors.backupFailed'), (err as Error).message);
-    }
-  }, [t]);
-
-  const handleRestore = useCallback(async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/octet-stream',
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled && result.assets?.[0]) {
-        Alert.alert(
-          t('settings.restoreBackup'),
-          t('settings.restoreBackup'),
-          [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-              text: t('settings.restoreBackup'),
-              style: 'destructive',
-              onPress: async () => {
-                const asset = result.assets?.[0];
-                if (!asset) return;
-                const db = DIContainer.resolve<DatabaseService>('DatabaseService');
-                await db.restore(asset.uri);
-                Alert.alert(t('common.success'), t('settings.restoreBackup'));
-                Updates.reloadAsync();
-              },
-            },
-          ],
-        );
-      }
-    } catch (err) {
-      Alert.alert(t('common.error'), (err as Error).message);
-    }
-  }, [t]);
 
   const handleClearVaults = useCallback(() => {
     Alert.alert(
@@ -209,12 +157,13 @@ function SettingsScreenContent() {
             if (khaznatiDir.exists) {
               khaznatiDir.delete();
             }
+            lockSession();
             router.replace('/(auth)/welcome');
           },
         },
       ],
     );
-  }, [vaults, deleteVault, t]);
+  }, [vaults, deleteVault, lockSession, t]);
 
   const handleActivityLog = useCallback(() => {
     router.push('/(app)/modals/activity-log');
@@ -234,21 +183,16 @@ function SettingsScreenContent() {
         await lockVault(vault.id);
       }
     }
-    router.push('/(auth)/welcome');
-  }, [vaults, lockVault]);
+    lockSession();
+    router.replace('/(auth)/welcome');
+  }, [vaults, lockVault, lockSession]);
 
   return (
-    <ScreenLayout title={t('settings.title')} hasTabs showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
+    <ScreenLayout title={t('settings.title')} hasTabs showBack onBack={() => router.back()}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.group}>
           <Typography variant="labelLarge" color={colors.primary} style={styles.groupTitle}>{t('settings.security')}</Typography>
           <Card variant="filled" padding={0}>
-            <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.outlineVariant }]} accessibilityRole="button" accessibilityLabel={t('settings.securitySettings')}>
-              <Icon name="shield-check" size={22} color={colors.onSurface} />
-              <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.securitySettings')}</Typography>
-              <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
-            </TouchableOpacity>
-            <Divider />
             <View style={[styles.settingItem, { borderBottomColor: colors.outlineVariant }]}>
               <Icon name={biometryType === 'fingerprint' ? 'fingerprint' : 'face-recognition'} size={22} color={colors.onSurface} />
               <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.biometrics')}</Typography>
@@ -269,18 +213,6 @@ function SettingsScreenContent() {
         <View style={styles.group}>
           <Typography variant="labelLarge" color={colors.primary} style={styles.groupTitle}>{t('settings.data')}</Typography>
           <Card variant="filled" padding={0}>
-            <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.outlineVariant }]} accessibilityRole="button" accessibilityLabel={t('settings.createBackup')} onPress={handleBackup}>
-              <Icon name="backup-restore" size={22} color={colors.onSurface} />
-              <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.createBackup')}</Typography>
-              <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
-            </TouchableOpacity>
-            <Divider />
-            <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.outlineVariant }]} accessibilityRole="button" accessibilityLabel={t('settings.restoreBackup')} onPress={handleRestore}>
-              <Icon name="restore" size={22} color={colors.onSurface} />
-              <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.restoreBackup')}</Typography>
-              <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
-            </TouchableOpacity>
-            <Divider />
             <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.outlineVariant }]} accessibilityRole="button" accessibilityLabel={t('settings.clearAllData')} onPress={handleClearVaults}>
               <Icon name="database" size={22} color={colors.onSurface} />
               <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.clearAllData')}</Typography>

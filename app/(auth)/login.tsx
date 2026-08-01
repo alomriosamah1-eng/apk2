@@ -14,6 +14,8 @@ import { useVaults } from '@ui/hooks/useVaults';
 import { useSecureStorage } from '@ui/hooks/useSecureStorage';
 import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
 import { DIContainer } from '@core/di/container';
+import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
+import { ActivityAction } from '@core/constants';
 import { useSession } from '@ui/providers/SessionProvider';
 
 const REMEMBER_KEY = 'khaznati_remember_vault';
@@ -29,6 +31,13 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  useEffect(() => {
+    getItem('biometric_enabled').then((value) => {
+      setBiometricEnabled(value === 'true');
+    }).catch(() => {});
+  }, [getItem]);
 
   useEffect(() => {
     loadVaults();
@@ -66,6 +75,8 @@ export default function LoginScreen() {
     } else {
       setError(result.error.message);
       setPassword('');
+      const repo = DIContainer.resolve<ActivityLogRepositoryImpl>('ActivityLogRepository');
+      void repo.log(ActivityAction.LOGIN_FAILED, 'vault', targetVault.id);
     }
     setLoginLoading(false);
   }, [password, targetVault, rememberMe, unlockVault, setItem, t]);
@@ -97,7 +108,7 @@ export default function LoginScreen() {
           <View style={styles.centerContent}>
             <Icon name="shield-off" size={64} color={colors.onSurfaceVariant} />
             <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.noVaultText}>{t('errors.vaultNotFound')}</Typography>
-            <Button title={t('vault.title')} onPress={() => router.push('/(app)/(tabs)/vault')} variant="primary" fullWidth style={styles.button} />
+            <Button title={t('vault.title')} onPress={() => router.replace('/(auth)/welcome')} variant="primary" fullWidth style={styles.button} />
           </View>
         </View>
       );
@@ -122,7 +133,7 @@ export default function LoginScreen() {
         <View style={styles.centerContent}>
           <Icon name="shield-off" size={64} color={colors.onSurfaceVariant} />
           <Typography variant="bodyLarge" color={colors.onSurfaceVariant} style={styles.noVaultText}>{t('errors.vaultNotFound')}</Typography>
-          <Button title={t('vault.title')} onPress={() => router.push('/(app)/(tabs)/vault')} variant="primary" fullWidth style={styles.button} />
+          <Button title={t('vault.title')} onPress={() => router.replace('/(auth)/welcome')} variant="primary" fullWidth style={styles.button} />
         </View>
       </View>
     );
@@ -164,9 +175,9 @@ export default function LoginScreen() {
 
             <Button title={loginLoading ? t('common.loading') : t('auth.unlock')} onPress={handleLogin} variant="primary" fullWidth size="lg" loading={loginLoading} disabled={!password.trim()} style={styles.button} />
 
-            {isAvailable && (
+            {isAvailable && biometricEnabled && (
               <Button
-                title={t('auth.enableBiometric', { biometricType: '' })}
+                title={t('auth.biometric')}
                 onPress={handleBiometric}
                 variant="glass"
                 fullWidth

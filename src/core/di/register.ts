@@ -6,7 +6,6 @@ import { ItemRepositoryImpl } from '@data/repositories/ItemRepositoryImpl';
 import { NoteRepositoryImpl } from '@data/repositories/NoteRepositoryImpl';
 import { PasswordRepositoryImpl } from '@data/repositories/PasswordRepositoryImpl';
 import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
-import { SettingsRepositoryImpl } from '@data/repositories/SettingsRepositoryImpl';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 import { FileSystemSource } from '@data/datasources/FileSystemSource';
 import { CreateVaultUseCase } from '@domain/usecases/vault/CreateVaultUseCase';
@@ -63,9 +62,6 @@ export function registerDependencies(): void {
   );
   DIContainer.registerSingleton('ActivityLogRepository', () =>
     new ActivityLogRepositoryImpl(DIContainer.resolve<DatabaseService>('DatabaseService')),
-  );
-  DIContainer.registerSingleton('SettingsRepository', () =>
-    new SettingsRepositoryImpl(DIContainer.resolve<DatabaseService>('DatabaseService')),
   );
 
   // Use Cases

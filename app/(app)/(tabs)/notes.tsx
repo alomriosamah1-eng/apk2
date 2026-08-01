@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, RefreshControl, TouchableOpacity, TextInput as RNTextInput, ScrollView } from 'react-native';
+import { View, StyleSheet, RefreshControl, TouchableOpacity, TextInput as RNTextInput, ScrollView, Alert, Share } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
@@ -13,16 +13,20 @@ import { Loading } from '@ui/components/atoms/Loading';
 import { ErrorView } from '@ui/components/atoms/ErrorView';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@ui/components/atoms/Icon';
+import { useSession } from '@ui/providers/SessionProvider';
 import { DIContainer } from '@core/di/container';
 import { INoteRepository } from '@domain/repositories/INoteRepository';
 import { Note } from '@domain/entities/Note';
+import { ActivityAction } from '@core/constants';
 import { generateId } from '@core/utils';
+import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
 
 export default function NotesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { vaultId: paramsVaultId } = useLocalSearchParams<{ vaultId: string }>();
-  const vaultId = paramsVaultId || '';
+  const { lock: lockSession } = useSession();
+  const { vaultId: paramsVaultId, create } = useLocalSearchParams<{ vaultId: string; create?: string }>();
+  const vaultId = paramsVaultId || 'default';
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,6 +59,13 @@ export default function NotesScreen() {
     loadNotes();
   }, [loadNotes]);
 
+  useEffect(() => {
+    if (create === '1' || create === 'true') {
+      handleCreate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [create]);
+
   const handleCreate = useCallback(() => {
     setEditingNote({
       id: generateId(),
@@ -86,16 +97,45 @@ export default function NotesScreen() {
       : await repo.create(updated);
     if (result.success) {
       await loadNotes();
+      const repoLog = DIContainer.resolve<ActivityLogRepositoryImpl>('ActivityLogRepository');
+      void repoLog.log(
+        existingIndex >= 0 ? ActivityAction.EDIT_NOTE : ActivityAction.CREATE_NOTE,
+        'note',
+        undefined,
+        { vaultId, title: editTitle || t('notes.untitled') },
+      );
     }
     setEditingNote(null);
-  }, [editingNote, editTitle, editContent, notes, repo, loadNotes]);
+  }, [editingNote, editTitle, editContent, notes, repo, loadNotes, vaultId, t]);
 
-  const handleDelete = useCallback(async (id: string) => {
-    const result = await repo.delete(id);
-    if (result.success) {
-      await loadNotes();
+  const handleDelete = useCallback((id: string, title?: string) => {
+    Alert.alert(t('common.delete'), t('notes.deleteConfirm', { title: title || t('notes.untitled') }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          const result = await repo.delete(id);
+          if (result.success) {
+            await loadNotes();
+            const repoLog = DIContainer.resolve<ActivityLogRepositoryImpl>('ActivityLogRepository');
+            void repoLog.log(ActivityAction.DELETE_NOTE, 'note', undefined, {
+              vaultId,
+              title: title || t('notes.untitled'),
+            });
+          }
+        },
+      },
+    ]);
+  }, [repo, loadNotes, t, vaultId]);
+
+  const handleShare = useCallback(async (item: Note) => {
+    try {
+      await Share.share({ message: item.title ? `${item.title}\n\n${item.encryptedContent}` : item.encryptedContent });
+    } catch {
+      // user cancelled share
     }
-  }, [repo, loadNotes]);
+  }, []);
 
   const handleTogglePin = useCallback(async (id: string) => {
     await repo.togglePin(id);
@@ -131,12 +171,21 @@ export default function NotesScreen() {
   }, []);
 
   const handleBatchDelete = useCallback(async () => {
-    for (const id of selectedIds) {
-      await repo.delete(id);
-    }
-    clearSelection();
-    await loadNotes();
-  }, [selectedIds, repo, clearSelection, loadNotes]);
+    Alert.alert(t('common.delete'), t('notes.deleteConfirm', { title: t('notes.manyNotes', { count: selectedIds.size }) }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          for (const id of selectedIds) {
+            await repo.delete(id);
+          }
+          clearSelection();
+          await loadNotes();
+        },
+      },
+    ]);
+  }, [selectedIds, repo, clearSelection, loadNotes, t]);
 
   const sortedNotes = [...notes].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -190,7 +239,17 @@ export default function NotesScreen() {
   }
 
   return (
-    <ScreenLayout title={t('notes.title')} subtitle={t('vault.itemsCount', { count: notes.length })} showBack onBack={() => router.push('/(app)/(tabs)/vault')}>
+    <ScreenLayout
+      title={t('notes.title')}
+      subtitle={t('vault.itemsCount', { count: notes.length })}
+      showBack
+      onBack={() => router.back()}
+      rightAction={
+        <TouchableOpacity onPress={lockSession} accessibilityLabel={t('settings.quickExit')}>
+          <Icon name="lock-outline" size={24} color={colors.onSurface} />
+        </TouchableOpacity>
+      }
+    >
       <SearchBar value={search} onChangeText={setSearch} placeholder={t('notes.search')} onClear={() => setSearch('')} />
       {isSelecting && (
         <SelectionBar
@@ -254,10 +313,13 @@ export default function NotesScreen() {
                     {new Date(item.updatedAt).toLocaleDateString()}
                   </Typography>
                   <View style={styles.noteActions}>
+                    <TouchableOpacity onPress={() => handleShare(item)} accessibilityLabel={t('common.share')}>
+                      <Icon name="share-variant" size={18} color={colors.onSurfaceVariant} />
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleTogglePin(item.id)}>
                       <Icon name="pin-outline" size={18} color={colors.onSurfaceVariant} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                    <TouchableOpacity onPress={() => handleDelete(item.id, item.title)}>
                       <Icon name="delete-outline" size={18} color={colors.error} />
                     </TouchableOpacity>
                   </View>

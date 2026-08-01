@@ -9,78 +9,124 @@ import { spacing, borderRadius, elevations } from '@core/theme';
 import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
 import { useVaults } from '@ui/hooks/useVaults';
+import { useSession } from '@ui/providers/SessionProvider';
+import { DIContainer } from '@core/di/container';
+import { IItemRepository } from '@domain/repositories/IItemRepository';
+import { ItemType } from '@core/constants';
+import { generateId } from '@core/utils';
+import { encryptFile } from '@core/utils/crypto';
+import { getVaultKey } from '@data/media/MediaStorage';
 
 interface AddOptionsSheetProps {
   visible: boolean;
   onClose: () => void;
+  /** Active vault id; must be a real id (P0-3 fix, Recovery/02 §0.7). */
+  vaultId?: string;
 }
 
-export default function AddOptionsSheet({ visible, onClose }: AddOptionsSheetProps) {
+export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOptionsSheetProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { vaults } = useVaults();
+  const { lock: lockSession } = useSession();
+
+  const getTargetVaultId = useCallback(() => {
+    if (vaultId) return vaultId;
+    const vault = vaults.find((v) => !v.isLocked);
+    return vault?.id ?? 'default';
+  }, [vaultId, vaults]);
 
   const getDefaultVaultDir = useCallback(() => {
-    const vault = vaults.find((v) => !v.isLocked);
-    if (!vault) return new Directory(Paths.document, 'khaznati', 'default');
-    return new Directory(Paths.document, 'khaznati', vault.id);
-  }, [vaults]);
+    const targetId = getTargetVaultId();
+    if (targetId === 'default') return new Directory(Paths.document, 'khaznati', 'default');
+    return new Directory(Paths.document, 'khaznati', targetId);
+  }, [getTargetVaultId]);
 
   const importToVault = useCallback(async (pickerOptions?: DocumentPicker.DocumentPickerOptions) => {
     const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, ...pickerOptions });
-    if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      const vaultDir = getDefaultVaultDir();
-      if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
-      const destFile = new File(vaultDir, asset.name);
-      destFile.create({ overwrite: true });
-      const srcFile = new File(asset.uri);
-      srcFile.copy(destFile);
-    }
-  }, [getDefaultVaultDir]);
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const targetId = getTargetVaultId();
+    const key = await getVaultKey(targetId);
+    const srcFile = new File(asset.uri);
+    const base64Data = await srcFile.base64();
+    const encryptedBase64 = await encryptFile(key, base64Data);
+
+    const vaultDir = getDefaultVaultDir();
+    if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
+    const encFileName = `${Date.now()}.${asset.name}.enc`;
+    const encFile = new File(vaultDir, encFileName);
+    await encFile.write(encryptedBase64);
+
+    const itemRepo = DIContainer.resolve<IItemRepository>('ItemRepository');
+    await itemRepo.create({
+      id: generateId(),
+      vaultId: targetId,
+      parentId: null,
+      name: asset.name,
+      type: ItemType.FILE,
+      mimeType: asset.mimeType || null,
+      size: asset.size || 0,
+      encryptedPath: encFile.uri,
+      encryptedData: null,
+      thumbnailPath: null,
+      metadata: null,
+      isFavorite: false,
+      isDeleted: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      deletedAt: null,
+    });
+  }, [getTargetVaultId, getDefaultVaultDir]);
+
+  const pushWithVault = useCallback((path: string, extra?: Record<string, string>) => {
+    const targetId = getTargetVaultId();
+    router.push({ pathname: path, params: { vaultId: targetId, ...extra } });
+  }, [getTargetVaultId]);
 
   const handleImportFile = useCallback(async () => {
     onClose();
     await importToVault();
-    router.push('/(app)/(tabs)/files');
-  }, [onClose, importToVault]);
+    pushWithVault('/(app)/(tabs)/files');
+  }, [onClose, importToVault, pushWithVault]);
 
   const handleImportPhoto = useCallback(async () => {
     onClose();
     await importToVault({ type: 'image/*' });
-    router.push('/(app)/(tabs)/media');
-  }, [onClose, importToVault]);
+    pushWithVault('/(app)/(tabs)/media');
+  }, [onClose, importToVault, pushWithVault]);
 
   const handleImportVideo = useCallback(async () => {
     onClose();
     await importToVault({ type: 'video/*' });
-    router.push('/(app)/(tabs)/files');
-  }, [onClose, importToVault]);
+    pushWithVault('/(app)/(tabs)/files');
+  }, [onClose, importToVault, pushWithVault]);
 
   const handleImportAudio = useCallback(async () => {
     onClose();
     await importToVault({ type: 'audio/*' });
-    router.push('/(app)/(tabs)/files');
-  }, [onClose, importToVault]);
+    pushWithVault('/(app)/(tabs)/files');
+  }, [onClose, importToVault, pushWithVault]);
 
   const handleWriteNote = useCallback(() => {
     onClose();
-    router.push('/(app)/(tabs)/notes');
-  }, [onClose]);
+    pushWithVault('/(app)/(tabs)/notes', { create: '1' });
+  }, [onClose, pushWithVault]);
 
   const handleAddPassword = useCallback(() => {
     onClose();
-    router.push('/(app)/(tabs)/passwords');
-  }, [onClose]);
+    pushWithVault('/(app)/(tabs)/passwords');
+  }, [onClose, pushWithVault]);
 
   const handleQuickExit = useCallback(() => {
     onClose();
+    lockSession();
     if (Platform.OS === 'android') {
       BackHandler.exitApp();
     } else {
-      router.push('/(auth)/welcome');
+      router.replace('/(auth)/welcome');
     }
-  }, [onClose]);
+  }, [onClose, lockSession]);
 
   const options = [
     { icon: 'file-import' as const, labelKey: 'files.addFile', onPress: handleImportFile },

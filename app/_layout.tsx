@@ -8,7 +8,8 @@ import * as Font from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold } from '@expo-google-fonts/cairo';
 import { ThemeProvider, useTheme } from '@ui/providers/ThemeProvider';
 import { SessionProvider } from '@ui/providers/SessionProvider';
-import '@core/i18n';
+import { ErrorBoundary } from '@ui/components/ErrorBoundary';
+import { initI18n } from '@core/i18n';
 import { registerDependencies } from '@core/di/register';
 import { DatabaseService } from '@data/database/DatabaseService';
 import { MigrationRunner } from '@data/database/MigrationRunner';
@@ -59,6 +60,7 @@ export default function RootLayout() {
   useEffect(() => {
     async function init() {
       try {
+        await initI18n();
         await Font.loadAsync({
           Cairo: Cairo_400Regular,
           Cairo_500Medium,
@@ -89,15 +91,17 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <SessionProvider>
-            <RootLayoutInner />
-          </SessionProvider>
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <SessionProvider>
+              <RootLayoutInner />
+            </SessionProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

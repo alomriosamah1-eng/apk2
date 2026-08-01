@@ -51,7 +51,6 @@ export class CreateVaultUseCase {
       lockedUntil: null,
       itemCount: 0,
       totalSize: 0,
-      backupVersion: 0,
     };
 
     const result = await this.vaultRepository.create(vault);

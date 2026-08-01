@@ -6,6 +6,8 @@ import { Icon } from '@ui/components/atoms/Icon';
 
 export interface FileItem {
   id: string;
+  /** Database row id (items.id), used to keep DB rows in sync. */
+  dbId?: string;
   name: string;
   type: 'file' | 'folder';
   size?: number;

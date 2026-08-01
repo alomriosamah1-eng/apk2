@@ -1,6 +1,6 @@
 import { IVaultRepository } from '@domain/repositories/IVaultRepository';
-import { Result, failure, AuthenticationError } from '@core/errors';
-import { hashPin } from '@core/utils';
+import { Result, failure, AuthenticationError, DomainError } from '@core/errors';
+import { verifyPin, hashPin } from '@core/utils';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 5 * 60 * 1000;
@@ -32,9 +32,9 @@ export class UnlockVaultUseCase {
       });
     }
 
-    const pinHash = await hashPin(pin, vault.pinSalt);
+    const verification = await verifyPin(pin, vault.pinSalt, vault.encryptedPinHash);
 
-    if (pinHash !== vault.encryptedPinHash) {
+    if (!verification.verified) {
       const newFailed = vault.failedAttempts + 1;
       let lockedUntil: number | null = null;
       if (newFailed >= MAX_ATTEMPTS) {
@@ -58,6 +58,22 @@ export class UnlockVaultUseCase {
         lockedUntil: null,
       });
     }
+
+    if (verification.legacy) {
+      const currentHash = await hashPin(pin, vault.pinSalt);
+      const migrated = await this.vaultRepository.update({
+        ...vault,
+        encryptedPinHash: currentHash,
+      });
+      if (!migrated.success) {
+        return failure(new DomainError(
+          'Could not upgrade PIN hash',
+          'PIN_HASH_UPGRADE_FAILED',
+          { cause: (migrated.error as Error).message },
+        ));
+      }
+    }
+
     return this.vaultRepository.unlock(id);
   }
 }

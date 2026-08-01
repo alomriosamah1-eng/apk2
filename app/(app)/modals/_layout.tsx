@@ -15,7 +15,6 @@ export default function ModalsLayout() {
       }}
     >
       <Stack.Screen name="file-preview" />
-      <Stack.Screen name="create-folder" />
       <Stack.Screen name="activity-log" />
       <Stack.Screen name="about" />
     </Stack>

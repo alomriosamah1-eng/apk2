@@ -9,6 +9,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useTheme } from '@ui/providers/ThemeProvider';
+import { useTranslation } from 'react-i18next';
 import { spacing, borderRadius } from '@core/theme';
 import { Typography } from './Typography';
 import { Icon } from './Icon';
@@ -35,6 +36,7 @@ function InputComponent({
   ...props
 }: InputProps, ref: React.Ref<TextInput>) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = useState(false);
   const [isSecureVisible, setIsSecureVisible] = useState(false);
 
@@ -87,7 +89,7 @@ function InputComponent({
             secureTextEntry={effectiveSecure}
             allowFontScaling
             maxFontSizeMultiplier={1.4}
-            accessibilityLabel={label ?? props.placeholder ?? 'Input'}
+            accessibilityLabel={label ?? props.placeholder ?? t('common.input')}
             {...props}
           />
           {showSecureToggle && secureTextEntry && (
@@ -95,7 +97,7 @@ function InputComponent({
               onPress={toggleSecure}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessibilityRole="button"
-              accessibilityLabel={isSecureVisible ? 'Hide password' : 'Show password'}
+              accessibilityLabel={isSecureVisible ? t('common.hidePassword') : t('common.showPassword')}
               style={styles.iconRight}
             >
               <Icon

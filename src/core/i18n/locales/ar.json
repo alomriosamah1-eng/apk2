@@ -28,7 +28,14 @@
     "on": "تشغيل",
     "off": "إيقاف",
     "add": "إضافة",
-    "share": "مشاركة"
+    "share": "مشاركة",
+    "rename": "إعادة تسمية",
+    "reload": "إعادة التحميل",
+    "clearSelection": "مسح التحديد",
+    "goBack": "رجوع",
+    "input": "حقل إدخال",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور"
   },
   "auth": {
     "welcome": "مرحباً بك في خزنتي",
@@ -65,7 +72,8 @@
     "selectColor": "اختر لوناً",
     "faceId": "الوجه",
     "iconA11y": "أيقونة {{name}}",
-    "colorA11y": "لون {{hex}}"
+    "colorA11y": "لون {{hex}}",
+    "biometric": "الفتح بالبصمة"
   },
   "vault": {
     "title": "الخزائن",
@@ -86,8 +94,8 @@
       "secureStorageDesc": "تشفيّر وحماية ملفاتك الحساسة",
       "biometricLock": "قفل بصمة",
       "biometricLockDesc": "افتح الخزنة ببصمتك أو وجهك",
-      "backup": "نسخ احتياطي",
-      "backupDesc": "لا تفقد بياناتك أبداً بنسخ احتياطية مشفرة"
+      "offlineFirst": "خاص وبدون إنترنت",
+      "offlineFirstDesc": "كل شيء يبقى على جهازك، ولا يُرسل إلى السحابة"
     }
   },
   "files": {
@@ -117,7 +125,9 @@
     "dateCreated": "تاريخ الإنشاء",
     "export": "تصدير إلى الجهاز",
     "exportSuccess": "تم تصدير الملفات بنجاح",
-    "deleteConfirm": "حذف {{name}}؟"
+    "deleteConfirm": "حذف {{name}}؟",
+    "nameExists": "يوجد ملف بهذا الاسم بالفعل",
+    "namePlaceholder": "أدخل اسماً جديداً"
   },
   "media": {
     "title": "الوسائط",
@@ -128,7 +138,8 @@
     "emptyDesc": "أضف صوراً وفيديوهات إلى خزنتك",
     "export": "استخراج إلى المعرض",
     "exportSuccess": "تم استخراج الصورة إلى معرض الصور",
-    "deleteConfirm": "حذف هذه الصورة؟"
+    "deleteConfirm": "حذف هذه الصورة؟",
+    "search": "بحث في الوسائط"
   },
   "notes": {
     "title": "الملاحظات",
@@ -144,8 +155,13 @@
     "unpin": "إلغاء التثبيت",
     "pin": "تثبيت",
     "search": "بحث في الملاحظات",
-    "untitled": "بدون عنوان",
-    "noContent": "لا يوجد محتوى"
+ "untitled": "بدون عنوان",
+ "noContent": "لا يوجد محتوى",
+ "manyNotes_one": "ملاحظة واحدة",
+ "manyNotes_two": "ملاحظتان",
+ "manyNotes_few": "{{count}} ملاحظات",
+ "manyNotes_many": "{{count}} ملاحظة",
+ "manyNotes_other": "{{count}} ملاحظة"
   },
   "passwords": {
     "title": "كلمات المرور",
@@ -161,6 +177,7 @@
     "usernamePlaceholder": "أدخل اسم المستخدم",
     "password": "كلمة المرور",
     "passwordPlaceholder": "أدخل كلمة المرور",
+    "notesPlaceholder": "ملاحظات إضافية",
     "category": "التصنيف",
     "notes": "ملاحظات إضافية",
     "strength": "قوة كلمة المرور",
@@ -216,11 +233,6 @@
     "storage": "التخزين",
     "storageUsed": "المساحة المستخدمة",
     "storageFree": "المساحة المتبقية",
-    "backup": "النسخ الاحتياطي",
-    "autoBackup": "النسخ الاحتياطي التلقائي",
-    "backupInterval": "فترة النسخ الاحتياطي",
-    "createBackup": "إنشاء نسخة احتياطية",
-    "restoreBackup": "استعادة نسخة احتياطية",
     "about": "حول",
     "version": "الإصدار",
     "licenses": "التراخيص",
@@ -234,21 +246,21 @@
     "after15min": "بعد 15 دقيقة",
     "after30min": "بعد 30 دقيقة",
     "thumbnailQuality": "جودة الصور المصغرة",
-    "backupDialogTitle": "إنشاء نسخة احتياطية",
-    "backupDialogMessage": "تم حفظ النسخة الاحتياطية في:\n{{path}}",
-    "noDatabaseBackup": "لا توجد قاعدة بيانات للنسخ الاحتياطي",
     "aboutDialog": "الإصدار 1.0.0\n\nخزنة مشفرة وآمنة لحياتك الرقمية.\n\nمبنية باستخدام Expo و React Native.",
     "licensesDialog": "يستخدم هذا التطبيق برمجيات مفتوحة المصدر:\n\n• Expo\n• React Native\n• SQLite\n• حزم مختلفة برخصة MIT",
     "autoLockDialogTitle": "القفل التلقائي",
     "autoLockDialogMessage": "اختر وقت القفل التلقائي للخزائن",
     "biometricAuthPrompt": "تحقق من هويتك لتفعيل البصمة",
+    "languageRestart": "سيتغير تطبيق اللغة بعد إعادة تشغيل التطبيق",
     "low": "منخفضة",
     "medium": "متوسطة",
-    "high": "عالية"
+    "high": "عالية",
+ "openSettings": "فتح الإعدادات"
   },
   "errors": {
     "general": "حدث خطأ غير متوقع",
     "network": "خطأ في الاتصال بالشبكة",
+    "boundaryTitle": "حدث خطأ ما",
     "database": "خطأ في قاعدة البيانات",
     "authentication": "فشل التحقق من الهوية",
     "biometricNotAvailable": "البصمة غير متوفرة على هذا الجهاز",
@@ -263,9 +275,9 @@
     "vaultLocked": "الخزنة مقفلة",
     "exportFailed": "فشل التصدير",
     "importFailed": "فشل الاستيراد",
-    "backupFailed": "فشل إنشاء النسخة الاحتياطية",
-    "restoreFailed": "فشل استعادة النسخة الاحتياطية",
-    "permission": "الإذن مطلوب"
+    "permission": "الإذن مطلوب",
+ "permissionTitle": "الإذن مطلوب",
+ "permissionRationale": "يحتاج Khaznati إلى الوصول إلى مكتبة الصور وملفات الوسائط لاستيراد وتصدير العناصر. الرجاء تفعيل الإذن من الإعدادات."
   },
   "about": {
     "title": "من نحن",
@@ -315,23 +327,35 @@
   "notifications": {
     "title": "الإشعارات",
     "empty": "لا توجد إشعارات",
-    "vaultLocked": "تم قفل الخزنة",
-    "backupComplete": "تم إنشاء النسخة الاحتياطية",
-    "backupFailed": "فشل إنشاء النسخة الاحتياطية",
-    "syncComplete": "تمت المزامنة بنجاح"
+    "vaultLocked": "تم قفل الخزنة"
   },
   "time": {
     "now": "الآن",
-    "minutesAgo": "قبل {{count}} دقيقة",
-    "minutesAgo_plural": "قبل {{count}} دقائق",
-    "hoursAgo": "قبل {{count}} ساعة",
-    "hoursAgo_plural": "قبل {{count}} ساعات",
+    "minutesAgo_one": "قبل {{count}} دقيقة",
+    "minutesAgo_two": "قبل {{count}} دقيقتين",
+    "minutesAgo_few": "قبل {{count}} دقائق",
+    "minutesAgo_many": "قبل {{count}} دقيقة",
+    "minutesAgo_other": "قبل {{count}} دقيقة",
+    "hoursAgo_one": "قبل {{count}} ساعة",
+    "hoursAgo_two": "قبل {{count}} ساعتين",
+    "hoursAgo_few": "قبل {{count}} ساعات",
+    "hoursAgo_many": "قبل {{count}} ساعة",
+    "hoursAgo_other": "قبل {{count}} ساعة",
     "yesterday": "أمس",
-    "daysAgo": "قبل {{count}} يوم",
-    "daysAgo_plural": "قبل {{count}} أيام",
-    "weeksAgo": "قبل {{count}} أسبوع",
-    "weeksAgo_plural": "قبل {{count}} أسابيع",
-    "monthsAgo": "قبل {{count}} شهر",
-    "monthsAgo_plural": "قبل {{count}} أشهر"
+    "daysAgo_one": "قبل {{count}} يوم",
+    "daysAgo_two": "قبل {{count}} يومين",
+    "daysAgo_few": "قبل {{count}} أيام",
+    "daysAgo_many": "قبل {{count}} يوم",
+    "daysAgo_other": "قبل {{count}} يوم",
+    "weeksAgo_one": "قبل {{count}} أسبوع",
+    "weeksAgo_two": "قبل {{count}} أسبوعين",
+    "weeksAgo_few": "قبل {{count}} أسابيع",
+    "weeksAgo_many": "قبل {{count}} أسبوع",
+    "weeksAgo_other": "قبل {{count}} أسبوع",
+    "monthsAgo_one": "قبل {{count}} شهر",
+    "monthsAgo_two": "قبل {{count}} شهرين",
+    "monthsAgo_few": "قبل {{count}} أشهر",
+    "monthsAgo_many": "قبل {{count}} شهر",
+    "monthsAgo_other": "قبل {{count}} شهر"
   }
 }

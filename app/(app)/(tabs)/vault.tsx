@@ -10,6 +10,7 @@ import { Typography } from '@ui/components/atoms/Typography';
 import AddOptionsSheet from '@ui/components/organisms/AddOptionsSheet';
 import VaultListSheet from '@ui/components/organisms/VaultListSheet';
 import { useVaults } from '@ui/hooks/useVaults';
+import { useSession } from '@ui/providers/SessionProvider';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_GAP = spacing.sm;
@@ -30,6 +31,7 @@ function VaultScreenContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { vaults } = useVaults();
+  const { lock: lockSession } = useSession();
   const { vaultId: activeVaultId } = useLocalSearchParams<{ vaultId: string }>();
   const currentVault = activeVaultId ? vaults.find((v) => v.id === activeVaultId) : vaults[0];
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -65,14 +67,15 @@ function VaultScreenContent() {
         router.push({ pathname: '/(app)/(tabs)/passwords', params: { vaultId: vid } });
         break;
       case 'locked':
+        lockSession();
         if (Platform.OS === 'android') {
           BackHandler.exitApp();
         } else {
-          router.push('/(auth)/welcome');
+          router.replace('/(auth)/welcome');
         }
         break;
     }
-  }, [activeVaultId, currentVault?.id]);
+  }, [activeVaultId, currentVault?.id, lockSession]);
 
   const handleSettings = useCallback(() => {
     router.push('/(app)/(tabs)/settings');
@@ -130,7 +133,7 @@ function VaultScreenContent() {
         <Icon name="plus" size={28} color={colors.onPrimary} />
       </TouchableOpacity>
 
-      <AddOptionsSheet visible={showAddSheet} onClose={closeAddSheet} />
+      <AddOptionsSheet visible={showAddSheet} onClose={closeAddSheet} vaultId={activeVaultId || currentVault?.id} />
       <VaultListSheet visible={showVaultList} onClose={() => setShowVaultList(false)} />
     </ScreenLayout>
   );

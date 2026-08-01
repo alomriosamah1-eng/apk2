@@ -1,4 +1,5 @@
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
 import { Typography } from '@ui/components/atoms/Typography';
@@ -19,6 +20,7 @@ interface SelectionBarProps {
 
 export function SelectionBar({ selectedCount, onClearSelection, actions }: SelectionBarProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   if (selectedCount === 0) return null;
 
   return (
@@ -44,7 +46,7 @@ export function SelectionBar({ selectedCount, onClearSelection, actions }: Selec
           </TouchableOpacity>
         ))}
       </View>
-      <TouchableOpacity onPress={onClearSelection} style={styles.closeBtn} accessibilityLabel="Clear selection">
+      <TouchableOpacity onPress={onClearSelection} style={styles.closeBtn} accessibilityLabel={t('common.clearSelection')}>
         <Icon name="close" size={22} color={colors.onPrimaryContainer} />
       </TouchableOpacity>
     </View>

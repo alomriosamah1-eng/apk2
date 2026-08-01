@@ -28,8 +28,6 @@ const ACTION_ICONS: Record<string, IconName> = {
   add_password: 'key-plus',
   edit_password: 'key',
   delete_password: 'key-remove',
-  backup_created: 'backup-restore',
-  backup_restored: 'database-refresh',
 };
 
 export default function ActivityLogModal() {
