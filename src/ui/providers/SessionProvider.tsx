@@ -12,13 +12,15 @@ interface SessionState {
 }
 
 interface SessionContextValue extends SessionState {
-  unlock: (vaultId: string) => void;
+  unlock: (vaultId: string, remember?: boolean) => void;
   lock: () => void;
   setAutoLockTimeout: (timeout: number) => void;
   recordActivity: () => void;
+  hydrated: boolean;
 }
 
 const AUTO_LOCK_KEY = 'auto_lock_timeout';
+const SESSION_KEY = 'khaznati_active_session';
 const DEFAULT_AUTO_LOCK = 300000;
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -30,6 +32,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     lastActivityTime: null,
     autoLockTimeout: DEFAULT_AUTO_LOCK,
   });
+  const [hydrated, setHydrated] = useState(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const backgroundTimeRef = useRef<number | null>(null);
   const storageRef = useRef<SecureStorageSource | null>(null);
@@ -37,20 +40,48 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     storageRef.current = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
     (async () => {
-      const stored = await storageRef.current!.get(AUTO_LOCK_KEY);
-      if (stored) {
-        setState(prev => ({ ...prev, autoLockTimeout: parseInt(stored, 10) }));
+      try {
+        const [storedTimeout, storedSession] = await Promise.all([
+          storageRef.current!.get(AUTO_LOCK_KEY),
+          storageRef.current!.get(SESSION_KEY),
+        ]);
+        setState((prev) => ({
+          ...prev,
+          autoLockTimeout: storedTimeout ? parseInt(storedTimeout, 10) : prev.autoLockTimeout,
+        }));
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession) as { vaultId: string; lastActivityTime: number };
+          if (parsed.vaultId) {
+            setState((prev) => ({
+              ...prev,
+              activeVaultId: parsed.vaultId,
+              isUnlocked: true,
+              lastActivityTime: parsed.lastActivityTime || Date.now(),
+            }));
+            router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: parsed.vaultId } });
+          }
+        }
+      } catch (error) {
+        // Ignore malformed/corrupt session; fall through to a fresh login.
+      } finally {
+        setHydrated(true);
       }
     })();
   }, []);
 
-  const unlock = useCallback((vaultId: string) => {
+  const unlock = useCallback((vaultId: string, remember = false) => {
     setState(prev => ({
       ...prev,
       activeVaultId: vaultId,
       isUnlocked: true,
       lastActivityTime: Date.now(),
     }));
+    if (remember && storageRef.current) {
+      void storageRef.current.set(
+        SESSION_KEY,
+        JSON.stringify({ vaultId, lastActivityTime: Date.now() }),
+      );
+    }
   }, []);
 
   const lock = useCallback(() => {
@@ -60,6 +91,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       activeVaultId: null,
       lastActivityTime: null,
     }));
+    if (storageRef.current) {
+      void storageRef.current.delete(SESSION_KEY);
+    }
   }, []);
 
   const setAutoLockTimeout = useCallback(async (timeout: number) => {
@@ -88,6 +122,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             activeVaultId: null,
             lastActivityTime: null,
           }));
+          if (storageRef.current) {
+            void storageRef.current.delete(SESSION_KEY);
+          }
           router.replace('/(auth)/login');
         }
       }
@@ -97,7 +134,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [state.autoLockTimeout, state.isUnlocked]);
 
   return (
-    <SessionContext.Provider value={{ ...state, unlock, lock, setAutoLockTimeout, recordActivity }}>
+    <SessionContext.Provider value={{ ...state, hydrated, unlock, lock, setAutoLockTimeout, recordActivity }}>
       {children}
     </SessionContext.Provider>
   );

@@ -67,7 +67,7 @@ export default function LoginScreen() {
 
     const result = await unlockVault(targetVault.id, password);
     if (result.success) {
-      session.unlock(targetVault.id);
+      session.unlock(targetVault.id, rememberMe);
       if (rememberMe) {
         await setItem(REMEMBER_KEY + '_' + targetVault.id, 'true');
       }
@@ -89,7 +89,7 @@ export default function LoginScreen() {
     const biometricUseCase = DIContainer.resolve<BiometricUnlockUseCase>('BiometricUnlockUseCase');
     const result = await biometricUseCase.execute(targetVault.id);
     if (result.success) {
-      session.unlock(targetVault.id);
+      session.unlock(targetVault.id, rememberMe);
       router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: targetVault.id } });
     } else {
       setError(t('errors.biometricFailed'));

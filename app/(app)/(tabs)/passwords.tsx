@@ -25,6 +25,7 @@ import { scheduleClipboardClear } from '@core/utils/clipboard';
 import { SecureStorageSource } from '@data/datasources/SecureStorageSource';
 import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
 import { ActivityAction } from '@core/constants';
+import { useSnackbar } from '@ui/providers/SnackbarProvider';
 
 const CATEGORIES = ['social', 'email', 'finance', 'shopping', 'work', 'entertainment', 'other'];
 
@@ -36,6 +37,7 @@ function logPasswordActivity(action: ActivityAction, vaultId: string, serviceNam
 export default function PasswordsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { show: showSnackbar } = useSnackbar();
   const { vaultId: paramsVaultId } = useLocalSearchParams<{ vaultId: string }>();
   const vaultId = paramsVaultId || 'default';
   const [entries, setEntries] = useState<PasswordEntry[]>([]);
@@ -141,11 +143,14 @@ export default function PasswordsScreen() {
         vaultId,
         formData.serviceName,
       );
+    } else {
+      showSnackbar(result?.error?.message || t('passwords.saveError'));
+      return;
     }
     setShowForm(false);
     setEditingId(null);
     setFormData({ serviceName: '', serviceUrl: '', username: '', password: '', notes: '' });
-  }, [formData, selectedCategory, editingId, entries, repo, vaultId, loadEntries]);
+  }, [formData, selectedCategory, editingId, entries, repo, vaultId, loadEntries, showSnackbar, t]);
 
   const handleEdit = useCallback((entry: PasswordEntry) => {
     setEditingId(entry.id);

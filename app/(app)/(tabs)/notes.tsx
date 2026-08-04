@@ -20,11 +20,13 @@ import { Note } from '@domain/entities/Note';
 import { ActivityAction } from '@core/constants';
 import { generateId } from '@core/utils';
 import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
+import { useSnackbar } from '@ui/providers/SnackbarProvider';
 
 export default function NotesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { lock: lockSession } = useSession();
+  const { show: showSnackbar } = useSnackbar();
   const { vaultId: paramsVaultId, create } = useLocalSearchParams<{ vaultId: string; create?: string }>();
   const vaultId = paramsVaultId || 'default';
   const [notes, setNotes] = useState<Note[]>([]);
@@ -104,9 +106,12 @@ export default function NotesScreen() {
         undefined,
         { vaultId, title: editTitle || t('notes.untitled') },
       );
+    } else {
+      showSnackbar(result.error?.message || t('notes.saveError'));
+      return;
     }
     setEditingNote(null);
-  }, [editingNote, editTitle, editContent, notes, repo, loadNotes, vaultId, t]);
+  }, [editingNote, editTitle, editContent, notes, repo, loadNotes, vaultId, t, showSnackbar]);
 
   const handleDelete = useCallback((id: string, title?: string) => {
     Alert.alert(t('common.delete'), t('notes.deleteConfirm', { title: title || t('notes.untitled') }), [

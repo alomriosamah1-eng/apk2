@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Modal, Pressable, BackHandler, Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -10,6 +10,7 @@ import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
 import { useVaults } from '@ui/hooks/useVaults';
 import { useSession } from '@ui/providers/SessionProvider';
+import { useSnackbar } from '@ui/providers/SnackbarProvider';
 import { DIContainer } from '@core/di/container';
 import { IItemRepository } from '@domain/repositories/IItemRepository';
 import { ItemType } from '@core/constants';
@@ -29,6 +30,8 @@ export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOption
   const { colors } = useTheme();
   const { vaults } = useVaults();
   const { lock: lockSession } = useSession();
+  const { show: showSnackbar } = useSnackbar();
+  const [importing, setImporting] = useState(false);
 
   const getTargetVaultId = useCallback(() => {
     if (vaultId) return vaultId;
@@ -42,42 +45,48 @@ export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOption
     return new Directory(Paths.document, 'khaznati', targetId);
   }, [getTargetVaultId]);
 
-  const importToVault = useCallback(async (pickerOptions?: DocumentPicker.DocumentPickerOptions) => {
-    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, ...pickerOptions });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    const targetId = getTargetVaultId();
-    const key = await getVaultKey(targetId);
-    const srcFile = new File(asset.uri);
-    const base64Data = await srcFile.base64();
-    const encryptedBase64 = await encryptFile(key, base64Data);
+  const importToVault = useCallback(async (pickerOptions?: DocumentPicker.DocumentPickerOptions): Promise<boolean> => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, ...pickerOptions });
+      if (result.canceled || !result.assets?.[0]) return false;
+      const asset = result.assets[0];
+      const targetId = getTargetVaultId();
+      const key = await getVaultKey(targetId);
+      const srcFile = new File(asset.uri);
+      const base64Data = await srcFile.base64();
+      const encryptedBase64 = await encryptFile(key, base64Data);
 
-    const vaultDir = getDefaultVaultDir();
-    if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
-    const encFileName = `${Date.now()}.${asset.name}.enc`;
-    const encFile = new File(vaultDir, encFileName);
-    await encFile.write(encryptedBase64);
+      const vaultDir = getDefaultVaultDir();
+      if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
+      const encFileName = `${Date.now()}.${asset.name}.enc`;
+      const encFile = new File(vaultDir, encFileName);
+      await encFile.write(encryptedBase64);
 
-    const itemRepo = DIContainer.resolve<IItemRepository>('ItemRepository');
-    await itemRepo.create({
-      id: generateId(),
-      vaultId: targetId,
-      parentId: null,
-      name: asset.name,
-      type: ItemType.FILE,
-      mimeType: asset.mimeType || null,
-      size: asset.size || 0,
-      encryptedPath: encFile.uri,
-      encryptedData: null,
-      thumbnailPath: null,
-      metadata: null,
-      isFavorite: false,
-      isDeleted: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      deletedAt: null,
-    });
-  }, [getTargetVaultId, getDefaultVaultDir]);
+      const itemRepo = DIContainer.resolve<IItemRepository>('ItemRepository');
+      await itemRepo.create({
+        id: generateId(),
+        vaultId: targetId,
+        parentId: null,
+        name: asset.name,
+        type: ItemType.FILE,
+        mimeType: asset.mimeType || null,
+        size: asset.size || 0,
+        encryptedPath: encFile.uri,
+        encryptedData: null,
+        thumbnailPath: null,
+        metadata: null,
+        isFavorite: false,
+        isDeleted: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        deletedAt: null,
+      });
+      return true;
+    } catch (error) {
+      showSnackbar(error instanceof Error ? error.message : t('common.error'));
+      return false;
+    }
+  }, [getTargetVaultId, getDefaultVaultDir, showSnackbar, t]);
 
   const pushWithVault = useCallback((path: string, extra?: Record<string, string>) => {
     const targetId = getTargetVaultId();
@@ -85,28 +94,52 @@ export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOption
   }, [getTargetVaultId]);
 
   const handleImportFile = useCallback(async () => {
+    if (importing) return;
     onClose();
-    await importToVault();
-    pushWithVault('/(app)/(tabs)/files');
-  }, [onClose, importToVault, pushWithVault]);
+    setImporting(true);
+    try {
+      const ok = await importToVault();
+      if (ok) pushWithVault('/(app)/(tabs)/files');
+    } finally {
+      setImporting(false);
+    }
+  }, [onClose, importToVault, pushWithVault, importing]);
 
   const handleImportPhoto = useCallback(async () => {
+    if (importing) return;
     onClose();
-    await importToVault({ type: 'image/*' });
-    pushWithVault('/(app)/(tabs)/media');
-  }, [onClose, importToVault, pushWithVault]);
+    setImporting(true);
+    try {
+      const ok = await importToVault({ type: 'image/*' });
+      if (ok) pushWithVault('/(app)/(tabs)/media');
+    } finally {
+      setImporting(false);
+    }
+  }, [onClose, importToVault, pushWithVault, importing]);
 
   const handleImportVideo = useCallback(async () => {
+    if (importing) return;
     onClose();
-    await importToVault({ type: 'video/*' });
-    pushWithVault('/(app)/(tabs)/files');
-  }, [onClose, importToVault, pushWithVault]);
+    setImporting(true);
+    try {
+      const ok = await importToVault({ type: 'video/*' });
+      if (ok) pushWithVault('/(app)/(tabs)/files');
+    } finally {
+      setImporting(false);
+    }
+  }, [onClose, importToVault, pushWithVault, importing]);
 
   const handleImportAudio = useCallback(async () => {
+    if (importing) return;
     onClose();
-    await importToVault({ type: 'audio/*' });
-    pushWithVault('/(app)/(tabs)/files');
-  }, [onClose, importToVault, pushWithVault]);
+    setImporting(true);
+    try {
+      const ok = await importToVault({ type: 'audio/*' });
+      if (ok) pushWithVault('/(app)/(tabs)/files');
+    } finally {
+      setImporting(false);
+    }
+  }, [onClose, importToVault, pushWithVault, importing]);
 
   const handleWriteNote = useCallback(() => {
     onClose();

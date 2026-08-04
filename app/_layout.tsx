@@ -8,6 +8,7 @@ import * as Font from 'expo-font';
 import { Cairo_400Regular, Cairo_500Medium, Cairo_600SemiBold, Cairo_700Bold } from '@expo-google-fonts/cairo';
 import { ThemeProvider, useTheme } from '@ui/providers/ThemeProvider';
 import { SessionProvider } from '@ui/providers/SessionProvider';
+import { SnackbarProvider } from '@ui/providers/SnackbarProvider';
 import { ErrorBoundary } from '@ui/components/ErrorBoundary';
 import { initI18n } from '@core/i18n';
 import { registerDependencies } from '@core/di/register';
@@ -95,9 +96,11 @@ export default function RootLayout() {
       <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
         <SafeAreaProvider>
           <ThemeProvider>
-            <SessionProvider>
-              <RootLayoutInner />
-            </SessionProvider>
+            <SnackbarProvider>
+              <SessionProvider>
+                <RootLayoutInner />
+              </SessionProvider>
+            </SnackbarProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

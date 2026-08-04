@@ -3,7 +3,7 @@ import { SCHEMA } from '../schema';
 
 /** Applies the initial schema (all tables and indexes). */
 export async function up(db: DatabaseService): Promise<void> {
-  await db.executeSql(SCHEMA);
+  await db.execSql(SCHEMA);
 }
 
 /** Drops all tables created by the initial migration. */

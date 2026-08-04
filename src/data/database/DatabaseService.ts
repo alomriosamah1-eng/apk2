@@ -91,6 +91,16 @@ export class DatabaseService {
     await withRetry(async () => { this.db!.runSync(sql, params as never); });
   }
 
+  /**
+   * Executes one or more SQL statements (e.g. DDL scripts with multiple
+   * CREATE statements). Unlike {@link executeSql}, this uses `execSync`, which
+   * runs every statement in the source string. `runSync` only runs the first.
+   */
+  async execSql(sql: string): Promise<void> {
+    this.ensureInitialized();
+    await withRetry(async () => { this.db!.execSync(sql); });
+  }
+
   /** Queries multiple rows and returns them as an array of T. */
   async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
     this.ensureInitialized();
@@ -137,8 +147,8 @@ export class DatabaseService {
   /** Returns the current user_version from PRAGMA. */
   async getVersion(): Promise<number> {
     this.ensureInitialized();
-    const row = await this.queryOne<{ version: number }>('PRAGMA user_version');
-    return row?.version ?? 0;
+    const row = await this.queryOne<{ user_version: number }>('PRAGMA user_version');
+    return row?.user_version ?? 0;
   }
 
   /** Sets the user_version via PRAGMA. */
