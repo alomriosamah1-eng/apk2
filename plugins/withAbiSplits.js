@@ -14,7 +14,6 @@ const SPLITS_BLOCK = `
 splits {
     abi {
         isEnable true
-        reset()
         include 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
         universalApk false
     }
