@@ -13,7 +13,7 @@ const SPLITS_BLOCK = `
 // ==== khaznati: per-ABI splits (config plugin) ==== //
 splits {
     abi {
-        isEnable true
+        enable true
         include 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
         universalApk false
     }
