@@ -3,3 +3,4 @@ export type { ItemDTO } from './ItemDTO';
 export type { NoteDTO } from './NoteDTO';
 export type { PasswordDTO } from './PasswordDTO';
 export type { ActivityLogDTO } from './ActivityLogDTO';
+export type { SecurityQuestionDTO } from './SecurityQuestionDTO';

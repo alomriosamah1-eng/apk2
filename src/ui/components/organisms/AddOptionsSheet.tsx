@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Modal, Pressable, BackHandler, Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import { Paths, File, Directory } from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing, borderRadius, elevations } from '@core/theme';
@@ -11,12 +10,7 @@ import { Icon } from '@ui/components/atoms/Icon';
 import { useVaults } from '@ui/hooks/useVaults';
 import { useSession } from '@ui/providers/SessionProvider';
 import { useSnackbar } from '@ui/providers/SnackbarProvider';
-import { DIContainer } from '@core/di/container';
-import { IItemRepository } from '@domain/repositories/IItemRepository';
-import { ItemType } from '@core/constants';
-import { generateId } from '@core/utils';
-import { encryptFile } from '@core/utils/crypto';
-import { getVaultKey } from '@data/media/MediaStorage';
+import { importUnits, deleteImportedSource, type ImportUnitSource } from '@data/media/MediaStorage';
 
 interface AddOptionsSheetProps {
   visible: boolean;
@@ -39,54 +33,35 @@ export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOption
     return vault?.id ?? 'default';
   }, [vaultId, vaults]);
 
-  const getDefaultVaultDir = useCallback(() => {
-    const targetId = getTargetVaultId();
-    if (targetId === 'default') return new Directory(Paths.document, 'khaznati', 'default');
-    return new Directory(Paths.document, 'khaznati', targetId);
-  }, [getTargetVaultId]);
-
   const importToVault = useCallback(async (pickerOptions?: DocumentPicker.DocumentPickerOptions): Promise<boolean> => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, ...pickerOptions });
-      if (result.canceled || !result.assets?.[0]) return false;
-      const asset = result.assets[0];
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true, ...pickerOptions });
+      if (result.canceled || result.assets.length === 0) return false;
       const targetId = getTargetVaultId();
-      const key = await getVaultKey(targetId);
-      const srcFile = new File(asset.uri);
-      const base64Data = await srcFile.base64();
-      const encryptedBase64 = await encryptFile(key, base64Data);
-
-      const vaultDir = getDefaultVaultDir();
-      if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
-      const encFileName = `${Date.now()}.${asset.name}.enc`;
-      const encFile = new File(vaultDir, encFileName);
-      await encFile.write(encryptedBase64);
-
-      const itemRepo = DIContainer.resolve<IItemRepository>('ItemRepository');
-      await itemRepo.create({
-        id: generateId(),
-        vaultId: targetId,
-        parentId: null,
-        name: asset.name,
-        type: ItemType.FILE,
+      // Unify on the shared bytes import engine (same path as the Media / Files
+      // tabs): it normalizes audio mime, computes content hashes, and only
+      // cleans up a source AFTER it was verified and persisted (never before).
+      const sources: ImportUnitSource[] = result.assets.map((asset) => ({
+        uri: asset.uri,
+        name: asset.name || 'file',
         mimeType: asset.mimeType || null,
         size: asset.size || 0,
-        encryptedPath: encFile.uri,
-        encryptedData: null,
-        thumbnailPath: null,
-        metadata: null,
-        isFavorite: false,
-        isDeleted: false,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        deletedAt: null,
+      }));
+      const report = await importUnits({
+        vaultId: targetId,
+        sources,
+        dedupe: true,
+        onSourceImported: async (src) => {
+          await deleteImportedSource(src.uri).catch(() => {});
+        },
       });
+      if (report.imported === 0 && report.failed > 0) return false;
       return true;
     } catch (error) {
       showSnackbar(error instanceof Error ? error.message : t('common.error'));
       return false;
     }
-  }, [getTargetVaultId, getDefaultVaultDir, showSnackbar, t]);
+  }, [getTargetVaultId, showSnackbar, t]);
 
   const pushWithVault = useCallback((path: string, extra?: Record<string, string>) => {
     const targetId = getTargetVaultId();
@@ -123,7 +98,7 @@ export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOption
     setImporting(true);
     try {
       const ok = await importToVault({ type: 'video/*' });
-      if (ok) pushWithVault('/(app)/(tabs)/files');
+      if (ok) pushWithVault('/(app)/(tabs)/media');
     } finally {
       setImporting(false);
     }
@@ -134,8 +109,11 @@ export default function AddOptionsSheet({ visible, onClose, vaultId }: AddOption
     onClose();
     setImporting(true);
     try {
-      const ok = await importToVault({ type: 'audio/*' });
-      if (ok) pushWithVault('/(app)/(tabs)/files');
+      // No mime filter: Android providers often label audio as octet-stream and
+      // an `audio/*` filter would hide them. importUnits normalizes real audio
+      // by extension, so all audio formats are reachable here.
+      const ok = await importToVault();
+      if (ok) pushWithVault('/(app)/(tabs)/media', { type: 'audio' });
     } finally {
       setImporting(false);
     }

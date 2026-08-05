@@ -7,7 +7,6 @@ import { spacing, borderRadius, elevations } from '@core/theme';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
 import { Icon } from '@ui/components/atoms/Icon';
 import { Typography } from '@ui/components/atoms/Typography';
-import AddOptionsSheet from '@ui/components/organisms/AddOptionsSheet';
 import VaultListSheet from '@ui/components/organisms/VaultListSheet';
 import { useVaults } from '@ui/hooks/useVaults';
 import { useSession } from '@ui/providers/SessionProvider';
@@ -34,7 +33,6 @@ function VaultScreenContent() {
   const { lock: lockSession } = useSession();
   const { vaultId: activeVaultId } = useLocalSearchParams<{ vaultId: string }>();
   const currentVault = activeVaultId ? vaults.find((v) => v.id === activeVaultId) : vaults[0];
-  const [showAddSheet, setShowAddSheet] = useState(false);
   const [showVaultList, setShowVaultList] = useState(false);
 
   const quickCards: QuickCard[] = [
@@ -44,7 +42,6 @@ function VaultScreenContent() {
     { id: 'audio', icon: 'music', labelKey: 'media.audio', color: '#FFB74D', iconBg: '#FFF3E0' },
     { id: 'notes', icon: 'note-text', labelKey: 'notes.title', color: '#66BB6A', iconBg: '#E8F5E9' },
     { id: 'passwords', icon: 'key', labelKey: 'passwords.title', color: '#AB47BC', iconBg: '#F3E5F5' },
-    { id: 'locked', icon: 'exit-run', labelKey: 'settings.quickExit', color: '#EF5350', iconBg: '#FFEBEE' },
   ];
 
   const handleCardPress = useCallback((card: QuickCard) => {
@@ -54,11 +51,13 @@ function VaultScreenContent() {
         router.push({ pathname: '/(app)/(tabs)/files', params: { vaultId: vid } });
         break;
       case 'photos':
-        router.push({ pathname: '/(app)/(tabs)/media', params: { vaultId: vid } });
+        router.push({ pathname: '/(app)/(tabs)/media', params: { vaultId: vid, type: 'image' } });
         break;
       case 'video':
+        router.push({ pathname: '/(app)/(tabs)/media', params: { vaultId: vid, type: 'video' } });
+        break;
       case 'audio':
-        router.push({ pathname: '/(app)/(tabs)/files', params: { vaultId: vid } });
+        router.push({ pathname: '/(app)/(tabs)/media', params: { vaultId: vid, type: 'audio' } });
         break;
       case 'notes':
         router.push({ pathname: '/(app)/(tabs)/notes', params: { vaultId: vid } });
@@ -66,16 +65,8 @@ function VaultScreenContent() {
       case 'passwords':
         router.push({ pathname: '/(app)/(tabs)/passwords', params: { vaultId: vid } });
         break;
-      case 'locked':
-        lockSession();
-        if (Platform.OS === 'android') {
-          BackHandler.exitApp();
-        } else {
-          router.replace('/(auth)/welcome');
-        }
-        break;
     }
-  }, [activeVaultId, currentVault?.id, lockSession]);
+  }, [activeVaultId, currentVault?.id]);
 
   const handleSettings = useCallback(() => {
     router.push('/(app)/(tabs)/settings');
@@ -85,8 +76,14 @@ function VaultScreenContent() {
     setShowVaultList(true);
   }, []);
 
-  const openAddSheet = useCallback(() => setShowAddSheet(true), []);
-  const closeAddSheet = useCallback(() => setShowAddSheet(false), []);
+  const handleExit = useCallback(() => {
+    if (Platform.OS === 'android') {
+      BackHandler.exitApp();
+    } else {
+      lockSession();
+      router.replace('/(auth)/login');
+    }
+  }, [lockSession]);
 
   return (
     <ScreenLayout
@@ -124,16 +121,15 @@ function VaultScreenContent() {
       </ScrollView>
 
       <TouchableOpacity
-        onPress={openAddSheet}
-        style={[styles.fab, { backgroundColor: colors.primary }]}
+        onPress={handleExit}
+        style={[styles.fab, { backgroundColor: colors.error }]}
         activeOpacity={0.8}
-        accessibilityLabel={t('common.add')}
+        accessibilityLabel={t('settings.quickExit')}
         accessibilityRole="button"
       >
-        <Icon name="plus" size={28} color={colors.onPrimary} />
+        <Icon name="exit-run" size={28} color="#FFFFFF" />
       </TouchableOpacity>
 
-      <AddOptionsSheet visible={showAddSheet} onClose={closeAddSheet} vaultId={activeVaultId || currentVault?.id} />
       <VaultListSheet visible={showVaultList} onClose={() => setShowVaultList(false)} />
     </ScreenLayout>
   );

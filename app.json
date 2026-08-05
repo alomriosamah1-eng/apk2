@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "khaznati",
-
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -25,6 +24,7 @@
     },
     "android": {
       "package": "com.khaznati.vault",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#121212",
         "foregroundImage": "./assets/android-icon-foreground.png"
@@ -69,6 +69,19 @@
             "video",
             "audio"
           ]
+        }
+      ],
+      "expo-audio",
+      "./plugins/withAbiSplits",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "minSdkVersion": 24,
+            "hermesEnabled": true
+          }
         }
       ]
     ]

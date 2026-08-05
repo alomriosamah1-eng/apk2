@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, TouchableOpacity, Dimensions, Alert, Text } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
@@ -8,10 +9,13 @@ import { Typography } from '@ui/components/atoms/Typography';
 import { Button } from '@ui/components/atoms/Button';
 import { Input } from '@ui/components/atoms/Input';
 import { Icon } from '@ui/components/atoms/Icon';
-import { VaultType } from '@core/constants';
+import { VaultType, ActivityAction } from '@core/constants';
 import { useVaults } from '@ui/hooks/useVaults';
 import { useSession } from '@ui/providers/SessionProvider';
-import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
+import { useSecurityQuestions } from '@ui/hooks/useSecurityQuestions';
+import { SecurityQuestionsForm, SecurityQuestionEntry } from '@ui/components/organisms/SecurityQuestionsForm';
+import { MIN_SECURITY_QUESTIONS, MIN_SECURITY_ANSWER_LENGTH } from '@core/constants/securityQuestions';
+import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
 import { DIContainer } from '@core/di/container';
 
 const COLORS = ['#6C63FF', '#FF6584', '#03DAC5', '#FFB74D', '#66BB6A', '#42A5F5', '#AB47BC', '#EF5350'];
@@ -31,6 +35,7 @@ export default function CreateVaultScreen() {
   const { colors } = useTheme();
   const { createVault } = useVaults();
   const { unlock } = useSession();
+  const { setup: setupQuestions } = useSecurityQuestions();
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -38,6 +43,16 @@ export default function CreateVaultScreen() {
   const [selectedColor, setSelectedColor] = useState('#6C63FF');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [secEntries, setSecEntries] = useState<SecurityQuestionEntry[]>(
+    Array.from({ length: MIN_SECURITY_QUESTIONS }, () => ({ question: '', answer: '' })),
+  );
+  const [showSecErrors, setShowSecErrors] = useState(false);
+
+  const copyError = useCallback(async () => {
+    if (!error) return;
+    await Clipboard.setStringAsync(error);
+    Alert.alert(t('common.copied') || 'Copied', error);
+  }, [error, t]);
 
   const strengthInfo = useMemo(() => getPinStrength(pin, t), [pin, t]);
 
@@ -56,6 +71,7 @@ export default function CreateVaultScreen() {
 
   const handleCreate = useCallback(async () => {
     setError(null);
+    setShowSecErrors(true);
     Keyboard.dismiss();
 
     if (!name.trim()) { setError(t('auth.nameRequired')); return; }
@@ -66,19 +82,33 @@ export default function CreateVaultScreen() {
     try {
       const result = await createVault({ name: name.trim(), type: VaultType.PERSONAL, pin, icon: selectedIcon, color: selectedColor });
       if (result.success) {
-        const biometricUseCase = DIContainer.resolve<BiometricUnlockUseCase>('BiometricUnlockUseCase');
-        await biometricUseCase.storeBiometricPin(result.data.id, pin);
+        const valid = secEntries.filter(
+          (e) => e.question.trim() && e.answer.trim().length >= MIN_SECURITY_ANSWER_LENGTH,
+        );
+        if (valid.length >= MIN_SECURITY_QUESTIONS) {
+          const inputs = valid.map((e) => ({ question: e.question.trim(), answer: e.answer.trim() }));
+          try {
+            const setupResult = await setupQuestions(result.data.id, pin, inputs);
+            if (setupResult.success) {
+              const repo = DIContainer.resolve<ActivityLogRepositoryImpl>('ActivityLogRepository');
+              void repo.log(ActivityAction.SECURITY_QUESTIONS_CHANGED, 'vault', result.data.id);
+            }
+          } catch {
+            // Non-blocking: vault creation must not fail because of questions.
+          }
+        }
         unlock(result.data.id);
         router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: result.data.id } });
       } else {
-        setError(result.error.message);
+        const cause = result.error.metadata?.['cause'];
+        setError(cause ? `${result.error.message} (${String(cause)})` : result.error.message);
       }
     } catch (err) {
       setError((err as Error).message || t('errors.general'));
     } finally {
       setLoading(false);
     }
-  }, [name, pin, confirmPin, createVault, unlock]);
+  }, [name, pin, confirmPin, createVault, unlock, secEntries, setupQuestions, t]);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -151,7 +181,27 @@ export default function CreateVaultScreen() {
               onSubmitEditing={handleCreate}
             />
 
-            {error && <Typography variant="bodySmall" color={colors.error} style={styles.errorText}>{error}</Typography>}
+            <Typography variant="titleSmall" color={colors.onSurfaceVariant} style={styles.sectionLabel}>
+              {t('recovery.setupTitle')}
+            </Typography>
+            <Typography variant="bodySmall" color={colors.onSurfaceVariant}>
+              {t('recovery.setupDesc')}
+            </Typography>
+            <SecurityQuestionsForm
+              entries={secEntries}
+              onChange={setSecEntries}
+              showErrors={showSecErrors}
+            />
+
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text selectable style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+                <TouchableOpacity onPress={copyError} style={styles.copyErrorBtn} accessibilityLabel="Copy error">
+                  <Icon name="content-copy" size={16} color={colors.primary} />
+                  <Typography variant="labelSmall" color={colors.primary}>{t('common.copyError') || 'Copy'}</Typography>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <Button
               title={loading ? t('common.loading') : t('auth.createVault')}
@@ -184,5 +234,7 @@ const styles = StyleSheet.create({
   strengthBar: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   strengthFill: { height: '100%', borderRadius: 3 },
   errorText: { marginTop: spacing.sm, textAlign: 'right' },
+  errorContainer: { marginTop: spacing.sm, alignItems: 'flex-end' },
+  copyErrorBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs, paddingVertical: 4 },
   button: { marginTop: spacing.xl },
 });

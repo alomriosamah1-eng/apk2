@@ -1,6 +1,7 @@
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
+import { ItemType } from '@core/constants';
 import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
 
@@ -9,7 +10,10 @@ export interface FileItem {
   /** Database row id (items.id), used to keep DB rows in sync. */
   dbId?: string;
   name: string;
+  mimeType: string | null;
   type: 'file' | 'folder';
+  /** The raw vault ItemType, kept for type/count-aware messages. */
+  itemType: ItemType;
   size?: number;
   createdAt: number;
 }

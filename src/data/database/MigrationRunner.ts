@@ -1,4 +1,6 @@
 import { DatabaseService } from './DatabaseService';
+import { SCHEMA } from './schema';
+import { logger } from '@core/utils';
 
 /** Describes a single database migration with up and down functions. */
 interface Migration {
@@ -19,6 +21,12 @@ export class MigrationRunner {
 
   /** Runs pending migrations up to the target version, or reverts if lower than current. */
   async run(db: DatabaseService, targetVersion?: number): Promise<void> {
+    // Self-healing bootstrap: the pre-fix app recorded migration 001 as applied
+    // but only created `vaults` (runSync executed a single statement). Running
+    // the full schema now is idempotent (every statement is IF NOT EXISTS), so
+    // it guarantees all tables/indexes exist before any migration runs.
+    await db.execSql(SCHEMA);
+
     await db.executeSql(`
       CREATE TABLE IF NOT EXISTS _migrations (
         version INTEGER PRIMARY KEY,
@@ -34,6 +42,12 @@ export class MigrationRunner {
     const currentVersion = Math.max(pragmaVersion, appliedMax);
 
     const maxVersion = targetVersion ?? this.migrations.length;
+
+    logger.info('Migration check', {
+      currentVersion,
+      maxVersion,
+      appliedMigrations: appliedMax,
+    });
 
     this.migrations.sort((a, b) => a.version - b.version);
 

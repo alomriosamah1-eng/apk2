@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Alert, Share, Linking } from 'react-native';
+import { View, StyleSheet, Alert, Share } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
-import { Paths, File, Directory } from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
+import { File, Directory } from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import { ScreenLayout } from '@ui/components/organisms/ScreenLayout';
 import { SearchBar } from '@ui/components/molecules/SearchBar';
@@ -17,13 +16,14 @@ import { FileItem } from '@ui/components/molecules/FileRow';
 import { DIContainer } from '@core/di/container';
 import { IItemRepository } from '@domain/repositories/IItemRepository';
 import { ItemType, ActivityAction } from '@core/constants';
-import { generateId } from '@core/utils';
-import { encryptFile } from '@core/utils/crypto';
-import { getVaultKey, exportDecryptedToLibrary, readAndDecryptFile } from '@data/media/MediaStorage';
+import { getEncryptedDir, deleteImportedSource, pickSafDirectory, exportUnits, importUnits, type ExportUnitInput, type ExportMode, type ExportBatchReport, type ImportUnitSource, type ImportBatchReport } from '@data/media/MediaStorage';
+import { confirmBody, successBody, deleteSuccessBody, batchReportBody } from '@ui/utils/itemMessages';
+import { OperationProgress } from '@ui/components/organisms/OperationProgress';
+import { useOperationProgress } from '@ui/hooks/useOperationProgress';
 import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
 
 function getVaultDir(vaultId: string): Directory {
-  return new Directory(Paths.document, 'khaznati', vaultId || 'default');
+  return getEncryptedDir(vaultId);
 }
 
 function logItemActivity(action: ActivityAction, vaultId: string, itemName: string): void {
@@ -49,6 +49,8 @@ export default function FilesScreen(): React.JSX.Element {
     [],
   );
 
+  const op = useOperationProgress();
+
   const loadFiles = useCallback(async () => {
     try {
       setError(null);
@@ -57,14 +59,18 @@ export default function FilesScreen(): React.JSX.Element {
         setError(result.error.message);
         return;
       }
-      const items: FileItem[] = result.data.map((it) => ({
-        id: it.encryptedPath ?? it.id,
-        dbId: it.id,
-        name: it.name,
-        type: it.type === ItemType.FOLDER ? 'folder' : 'file',
-        size: it.size,
-        createdAt: it.createdAt,
-      }));
+      const items: FileItem[] = result.data
+        .filter((it) => it.type === ItemType.FILE || it.type === ItemType.FOLDER)
+        .map((it) => ({
+          id: it.encryptedPath ?? it.id,
+          dbId: it.id,
+          name: it.name,
+          mimeType: it.mimeType,
+          type: it.type === ItemType.FOLDER ? 'folder' : 'file',
+          itemType: it.type,
+          size: it.size,
+          createdAt: it.createdAt,
+        }));
       setFiles(items);
     } catch (err) {
       setError((err as Error).message);
@@ -85,45 +91,58 @@ export default function FilesScreen(): React.JSX.Element {
 
   const handleImport = useCallback(async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      const key = await getVaultKey(vid);
-      const srcFile = new File(asset.uri);
-      const base64Data = await srcFile.base64();
-      const encryptedBase64 = await encryptFile(key, base64Data);
-
-      const vaultDir = getVaultDir(vid);
-      if (!vaultDir.exists) vaultDir.create({ intermediates: true, idempotent: true });
-      const encFileName = `${Date.now()}.${asset.name}.enc`;
-      const encFile = new File(vaultDir, encFileName);
-      await encFile.write(encryptedBase64);
-
-      await itemRepo.create({
-        id: generateId(),
-        vaultId: vid,
-        parentId: null,
-        name: asset.name,
-        type: ItemType.FILE,
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true });
+      if (result.canceled || result.assets.length === 0) return;
+      const sources: ImportUnitSource[] = result.assets.map((asset) => ({
+        uri: asset.uri,
+        name: asset.name || `file_${Date.now()}`,
         mimeType: asset.mimeType || null,
-        size: asset.size || 0,
-        encryptedPath: encFile.uri,
-        encryptedData: null,
-        thumbnailPath: null,
-        metadata: null,
-        isFavorite: false,
-        isDeleted: false,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        deletedAt: null,
-      });
+      }));
 
-      logItemActivity(ActivityAction.ADD_ITEM, vid, asset.name);
-      loadFiles();
+      op.begin(sources.length);
+      try {
+        const report: ImportBatchReport = await importUnits({
+          vaultId: vid,
+          sources,
+          dedupe: true,
+          onProgress: op.update,
+          shouldCancel: op.isCancelled,
+          onSourceImported: async (src) => {
+            try {
+              await deleteImportedSource(src.uri);
+            } catch { /* best-effort cleanup of the picked copy */ }
+          },
+        });
+
+        if (report.imported > 0) {
+          logItemActivity(ActivityAction.ADD_ITEM, vid, `${report.imported} file(s)`);
+        }
+        loadFiles();
+
+        if (report.failed > 0 || report.cancelled) {
+          const parts = [
+            t('progress.files', { done: report.imported, total: sources.length }),
+          ];
+          if (report.skippedDuplicates > 0) parts.push(t('media.importSkippedCount', { count: report.skippedDuplicates }));
+          if (report.failed > 0) parts.push(t('media.importFailedCount', { count: report.failed }));
+          if (report.cancelled) parts.push(t('progress.cancelled'));
+          for (const err of report.errors.slice(0, 3)) parts.push(`- ${err.name}: ${err.message}`);
+          Alert.alert(t('common.error'), parts.join('\n'));
+        } else {
+          Alert.alert(t('common.success'), t('media.importSummary', {
+            imported: report.imported,
+            skipped: report.skippedDuplicates,
+            failed: report.failed,
+          }));
+        }
+      } finally {
+        op.finish();
+      }
     } catch (err) {
+      op.finish();
       setError((err as Error).message);
     }
-  }, [loadFiles, itemRepo, vid]);
+  }, [vid, loadFiles, t, op]);
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -140,21 +159,25 @@ export default function FilesScreen(): React.JSX.Element {
     setRenameText('');
   }, []);
 
-  const handleBatchDelete = useCallback(() => {
-    Alert.alert(t('common.delete'), t('files.deleteConfirm', { name: `${selectedIds.size} item(s)` }), [
+  const toTyped = (list: FileItem[]) => list.map((f) => ({ type: f.itemType }));
+
+const handleBatchDelete = useCallback(() => {
+    const selected = files.filter((f) => selectedIds.has(f.id));
+    if (selected.length === 0) return;
+    Alert.alert(t('common.delete'), confirmBody(t, toTyped(selected), 'deleteConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
         style: 'destructive',
         onPress: (): void => {
-          selectedIds.forEach((id) => {
-            const item = files.find((f) => f.id === id);
-            if (item?.dbId) void itemRepo.delete(item.dbId);
-            new File(id).delete();
-            if (item) logItemActivity(ActivityAction.DELETE_ITEM, vid, item.name);
+          selected.forEach((item) => {
+            if (item.dbId) void itemRepo.delete(item.dbId);
+            new File(item.id).delete();
+            logItemActivity(ActivityAction.DELETE_ITEM, vid, item.name);
           });
           clearSelection();
           loadFiles();
+          Alert.alert(t('common.success'), deleteSuccessBody(t, toTyped(selected)));
         },
       },
     ]);
@@ -165,36 +188,92 @@ export default function FilesScreen(): React.JSX.Element {
     await Share.share({ message: names });
   }, [selectedIds, files]);
 
-  const handleBatchExport = useCallback(async () => {
-    const selected = files.filter((f) => selectedIds.has(f.id) && f.type === 'file');
-    if (selected.length === 0) return;
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('errors.permissionRationale'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('settings.openSettings'), onPress: () => void Linking.openSettings() },
-      ]);
-      return;
-    }
+  const runExport = useCallback(async (selected: FileItem[], mode: ExportMode) => {
     try {
-      const key = await getVaultKey(vid);
-      for (const item of selected) {
-        const decryptedBase64 = await readAndDecryptFile(key, item.id);
-        await exportDecryptedToLibrary(item.name, decryptedBase64);
+      const units: ExportUnitInput[] = selected.map((f) => ({
+        encryptedPath: f.id,
+        dbId: f.dbId,
+        name: f.name,
+        mimeType: f.mimeType,
+      }));
+      const mediaOnly = units.every((u) => {
+        const mime = (u.mimeType || '').toLowerCase();
+        return mime.startsWith('image/') || mime.startsWith('video/') || mime.startsWith('audio/');
+      });
+      let directoryUri: string | null = null;
+      if (!mediaOnly) {
+        directoryUri = await pickSafDirectory();
+        if (!directoryUri) return; // user cancelled the folder picker
       }
-      clearSelection();
-      Alert.alert(t('common.success'), t('files.exportSuccess'));
+      op.begin(units.length);
+      try {
+        const report: ExportBatchReport = await exportUnits({
+          vaultId: vid,
+          items: units,
+          mode,
+          directoryUri,
+          onProgress: (u) =>
+            op.update({
+              phase: 'writing',
+              done: u.done,
+              total: u.total,
+              currentName: u.currentName,
+              bytesProcessed: 0,
+              elapsedMs: u.elapsedMs,
+              speedBytesPerSec: 0,
+            }),
+          shouldCancel: op.isCancelled,
+        });
+        if (mode === 'extract') {
+          loadFiles();
+          clearSelection();
+        }
+        if (report.failed > 0 || report.cancelled > 0) {
+          Alert.alert(t('common.error'), batchReportBody(t, report));
+        } else if (mode === 'extract') {
+          Alert.alert(t('common.success'), successBody(t, toTyped(selected), 'extractSuccess'));
+        } else {
+          Alert.alert(t('common.success'), successBody(t, toTyped(selected), 'copySuccess'));
+        }
+        return;
+      } finally {
+        op.finish();
+      }
     } catch (err) {
+      op.finish();
       Alert.alert(t('common.error'), (err as Error).message);
     }
-  }, [selectedIds, files, clearSelection, t, vid]);
+  }, [vid, loadFiles, clearSelection, t, op]);
+
+  const chooseExport = useCallback((selected: FileItem[]) => {
+    if (selected.length === 0) return;
+    Alert.alert(t('action.extractTitle'), `${confirmBody(t, toTyped(selected), 'extractConfirm')}\n\n${t('action.extractHint')}`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('action.copy'), onPress: (): void => void runExport(selected, 'copy') },
+      { text: t('action.extract'), onPress: (): void => void runExport(selected, 'extract') },
+    ]);
+  }, [t, runExport]);
+
+  const handleBatchExport = useCallback(() => {
+    chooseExport(files.filter((f) => selectedIds.has(f.id) && f.type === 'file'));
+  }, [chooseExport, selectedIds, files]);
 
   const handleFilePress = useCallback((item: FileItem) => {
-    router.push({ pathname: '/(app)/modals/file-preview', params: { fileName: item.name, uri: item.id, vaultId: vid } });
+    router.push({
+      pathname: '/(app)/modals/file-preview',
+      params: {
+        fileName: item.name,
+        uri: item.id,
+        vaultId: vid,
+        type: item.itemType,
+        dbId: item.dbId || '',
+        size: String(item.size ?? ''),
+      },
+    });
   }, [vid]);
 
   const handleDeleteFile = useCallback((item: FileItem) => {
-    Alert.alert(t('common.delete'), t('files.deleteConfirm', { name: item.name }), [
+    Alert.alert(t('common.delete'), confirmBody(t, toTyped([item]), 'deleteConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -204,6 +283,7 @@ export default function FilesScreen(): React.JSX.Element {
           new File(item.id).delete();
           logItemActivity(ActivityAction.DELETE_ITEM, vid, item.name);
           loadFiles();
+          Alert.alert(t('common.success'), deleteSuccessBody(t, toTyped([item])));
         },
       },
     ]);
@@ -312,6 +392,7 @@ export default function FilesScreen(): React.JSX.Element {
         />
         <FloatingButton icon="plus" onPress={handleImport} accessibilityLabel={t('files.addFile')} />
       </View>
+      <OperationProgress progress={op.progress} onCancel={op.cancel} />
     </ScreenLayout>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, TouchableOpacity } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
@@ -9,9 +9,11 @@ import { Button } from '@ui/components/atoms/Button';
 import { Icon } from '@ui/components/atoms/Icon';
 import { Input } from '@ui/components/atoms/Input';
 import { Loading } from '@ui/components/atoms/Loading';
+import VaultListSheet from '@ui/components/organisms/VaultListSheet';
 import { useBiometrics } from '@ui/hooks/useBiometrics';
 import { useVaults } from '@ui/hooks/useVaults';
 import { useSecureStorage } from '@ui/hooks/useSecureStorage';
+import { useSecurityQuestions } from '@ui/hooks/useSecurityQuestions';
 import { BiometricUnlockUseCase } from '@domain/usecases/auth/BiometricUnlockUseCase';
 import { DIContainer } from '@core/di/container';
 import { ActivityLogRepositoryImpl } from '@data/repositories/ActivityLogRepositoryImpl';
@@ -27,11 +29,14 @@ export default function LoginScreen() {
   const { unlockVault, vaults, loading: vaultsLoading, loadVaults } = useVaults();
   const { getItem, setItem } = useSecureStorage();
   const session = useSession();
+  const { getQuestions } = useSecurityQuestions();
   const { id: vaultId } = useLocalSearchParams<{ id: string }>();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [showVaultList, setShowVaultList] = useState(false);
+  const [hasRecovery, setHasRecovery] = useState(false);
 
   useEffect(() => {
     getItem('biometric_enabled').then((value) => {
@@ -57,6 +62,19 @@ export default function LoginScreen() {
       if (remembered === 'true') setRememberMe(true);
     })();
   }, [getItem, targetVault?.id]);
+
+  useEffect(() => {
+    if (!targetVault) return;
+    (async () => {
+      const list = await getQuestions(targetVault.id);
+      setHasRecovery(list.length > 0);
+    })();
+  }, [targetVault?.id, getQuestions]);
+
+  const handleRecover = useCallback(() => {
+    if (!targetVault) return;
+    router.push({ pathname: '/(auth)/recover-vault', params: { vaultId: targetVault.id } });
+  }, [targetVault]);
 
   const handleLogin = useCallback(async () => {
     if (!targetVault) { setError(t('errors.vaultNotFound')); return; }
@@ -140,15 +158,28 @@ export default function LoginScreen() {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'android' ? undefined : 'padding'} style={styles.keyboardView}>
-          <View style={styles.header}>
+    <>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'android' ? undefined : 'padding'} style={styles.keyboardView}>
+            <View style={styles.header}>
             <View style={[styles.iconContainer, { backgroundColor: colors.primaryContainer }]}>
               <Icon name="lock" size={40} color={colors.primary} />
             </View>
             <Typography variant="headlineMedium">{t('auth.welcomeBack')}</Typography>
-            <Typography variant="titleSmall" color={colors.onSurfaceVariant}>{targetVault.name}</Typography>
+            {vaults.length > 1 ? (
+              <TouchableOpacity
+                onPress={() => setShowVaultList(true)}
+                accessibilityRole="button"
+                accessibilityLabel={t('vault.title')}
+                style={styles.vaultPicker}
+              >
+                <Typography variant="titleSmall" color={colors.primary} style={styles.vaultPickerName}>{targetVault.name}</Typography>
+                <Icon name="chevron-down" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            ) : (
+              <Typography variant="titleSmall" color={colors.onSurfaceVariant}>{targetVault.name}</Typography>
+            )}
           </View>
 
           <View style={styles.form}>
@@ -158,6 +189,8 @@ export default function LoginScreen() {
               onChangeText={handlePasswordChange}
               placeholder={t('auth.pinPlaceholder')}
               secureTextEntry
+              keyboardType="number-pad"
+              maxLength={8}
               showSecureToggle
               returnKeyType="done"
               onSubmitEditing={handleLogin}
@@ -175,6 +208,17 @@ export default function LoginScreen() {
 
             <Button title={loginLoading ? t('common.loading') : t('auth.unlock')} onPress={handleLogin} variant="primary" fullWidth size="lg" loading={loginLoading} disabled={!password.trim()} style={styles.button} />
 
+            {hasRecovery && (
+              <TouchableOpacity
+                onPress={handleRecover}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.forgotPin')}
+                style={styles.forgotLink}
+              >
+                <Typography variant="bodyMedium" color={colors.primary}>{t('auth.forgotPin')}</Typography>
+              </TouchableOpacity>
+            )}
+
             {isAvailable && biometricEnabled && (
               <Button
                 title={t('auth.biometric')}
@@ -190,7 +234,9 @@ export default function LoginScreen() {
           </View>
         </KeyboardAvoidingView>
       </View>
-    </TouchableWithoutFeedback>
+      </TouchableWithoutFeedback>
+      <VaultListSheet visible={showVaultList} onClose={() => setShowVaultList(false)} showDelete={false} />
+    </>
   );
 }
 
@@ -203,7 +249,19 @@ const styles = StyleSheet.create({
   rememberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   rememberTouchable: { flexDirection: 'row', alignItems: 'center' },
   rememberLabel: { marginLeft: spacing.sm },
+  vaultPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
+  },
+  vaultPickerName: {
+    marginRight: spacing.xs,
+  },
   button: { marginTop: spacing.md },
+  forgotLink: { alignSelf: 'center', marginTop: spacing.sm, padding: spacing.xs },
   biometric: { marginTop: spacing.sm },
   backButton: { marginTop: spacing.xs },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },

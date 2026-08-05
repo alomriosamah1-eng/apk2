@@ -70,7 +70,10 @@ describe('SessionProvider', () => {
     act(() => {
       result.current.unlock('vault-1', false);
     });
-    expect(mockSetItem).not.toHaveBeenCalled();
+    expect(mockSetItem).not.toHaveBeenCalledWith(
+      'khaznati_active_session',
+      expect.anything(),
+    );
   });
 
   it('locks the session and clears the active vault', async () => {

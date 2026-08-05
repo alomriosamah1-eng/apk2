@@ -46,6 +46,8 @@
     "vaultNamePlaceholder": "My Vault",
     "pinCode": "PIN Code",
     "pinPlaceholder": "Enter 4-8 digit PIN",
+    "currentPin": "Current PIN",
+    "newPin": "New PIN",
     "confirmPin": "Confirm PIN",
     "confirmPinPlaceholder": "Re-enter your PIN",
     "unlock": "Unlock",
@@ -73,7 +75,8 @@
     "faceId": "Face ID",
     "iconA11y": "Icon {{name}}",
     "colorA11y": "Color {{hex}}",
-    "biometric": "Biometric Unlock"
+    "biometric": "Biometric Unlock",
+    "forgotPin": "Forgot PIN?"
   },
   "vault": {
     "title": "Vaults",
@@ -89,7 +92,9 @@
     "itemsCount": "{{count}} item",
     "itemsCount_plural": "{{count}} items",
     "deleteConfirm": "Delete this vault?",
-    "deleteWarning": "All files and data inside this vault will be permanently deleted"
+    "deleteWarning": "All files and data inside this vault will be permanently deleted",
+    "deleteTitle": "Delete {{name}}",
+    "deleteVault": "Delete vault"
   },
   "welcome": {
     "features": {
@@ -109,6 +114,8 @@
     "addFolder": "Create Folder",
     "preview": "Preview",
     "videoPlayer": "Video Player",
+    "audioDecodeError": "This audio file could not be decoded by the device. It may be corrupted or use an unsupported codec.",
+    "audioSeek": "Seek",
     "fileType": "{{ext}} File",
     "noFileSelected": "No file selected",
     "folderName": "Folder Name",
@@ -136,13 +143,20 @@
     "title": "Media",
     "photos": "Photos",
     "videos": "Videos",
+    "importSummary": "Imported {{imported}}, skipped {{skipped}}, failed {{failed}}.",
+    "importSkippedCount": "{{count}} duplicates skipped.",
+    "importFailedCount": "{{count}} files failed to import.",
     "audio": "Audio",
     "empty": "No media yet",
     "emptyDesc": "Add photos and videos to your vault",
     "export": "Export to Gallery",
     "exportSuccess": "Photo exported to gallery",
     "deleteConfirm": "Delete this photo?",
-    "search": "Search media"
+    "search": "Search media",
+    "noAudioFiles": "No audio files were found. Select an audio file to import.",
+    "hideConfirm": "Hide the original files from the photo gallery and device storage?",
+    "hide": "Hide from gallery",
+    "keep": "Keep in gallery"
   },
   "notes": {
     "title": "Notes",
@@ -210,6 +224,10 @@
     "arabic": "العربية",
     "english": "English",
     "security": "Security",
+    "changePin": "Change PIN",
+    "changePinDesc": "Enter your current PIN, then choose a new one to secure the vault",
+    "securityQuestions": "Security Questions",
+    "securityQuestionsDesc": "Enable PIN recovery with security questions",
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
@@ -258,6 +276,45 @@
  "medium": "Medium",
  "high": "High",
  "openSettings": "Open Settings"
+  },
+  "recovery": {
+    "title": "Recover PIN",
+    "desc": "Answer your security questions to recover this vault's PIN",
+    "questionsStep": "Security Questions",
+    "questionsStepDesc": "Answer the questions below to verify your identity",
+    "answerLabel": "Answer for question {{count}}",
+    "answerPlaceholder": "Type your answer",
+    "verify": "Verify Answers",
+    "answersIncorrect": "Incorrect answer. Please try again.",
+    "attemptsLeft": "{{count}} attempt(s) left",
+    "tooManyAttempts": "Too many attempts. Please reopen this screen.",
+    "noQuestions": "No security questions are configured for this vault",
+    "resetStep": "Set a New PIN",
+    "resetStepDesc": "Your answers are correct. Choose a new PIN for the vault.",
+    "reset": "Set New PIN",
+    "success": "Your new PIN has been set successfully",
+    "setupTitle": "Security Questions",
+    "setupDesc": "Choose questions and answer them to recover your PIN if you forget it",
+    "setupHint": "Answer at least two questions to enable recovery",
+    "addQuestion": "Add Question",
+    "removeQuestion": "Remove Question",
+    "selectQuestion": "Choose a question",
+    "questionRequired": "Please choose a question",
+    "answerRequired": "Please enter an answer",
+    "answerTooShort": "Answer must be at least two characters",
+    "currencyPinRequired": "Enter your current PIN to change security questions",
+    "currentPinLabel": "Current PIN",
+    "save": "Save Questions",
+    "saved": "Security questions saved",
+    "presets": {
+      "motherName": "What is your mother's name?",
+      "favoriteCity": "What is your favorite city?",
+      "petName": "What is your pet's name?",
+      "firstSchool": "What was the name of your first school?",
+      "favoriteFood": "What is your favorite food?",
+      "firstCar": "What was the name of your first car?",
+      "birthCity": "In which city were you born?"
+    }
   },
   "errors": {
     "general": "An unexpected error occurred",
@@ -344,5 +401,60 @@
     "weeksAgo_plural": "{{count}} weeks ago",
     "monthsAgo": "{{count}} month ago",
     "monthsAgo_plural": "{{count}} months ago"
+  },
+  "itemType": {
+    "image": { "dem": "this photo", "one": "photo", "many": "photos" },
+    "video": { "dem": "this video", "one": "video", "many": "videos" },
+    "audio": { "dem": "this audio file", "one": "audio file", "many": "audio files" },
+    "document": { "dem": "this document", "one": "document", "many": "documents" },
+    "file": { "dem": "this file", "one": "file", "many": "files" }
+  },
+  "progress": {
+    "title": "Working…",
+    "waiting": "Waiting",
+    "reading": "Reading files",
+    "hashing": "Checking for duplicates",
+    "encrypting": "Encrypting",
+    "writing": "Saving",
+    "done": "Finished",
+    "percent": "{{percent}}%",
+    "files": "{{done}} / {{total}} files",
+    "remaining": "{{count}} remaining",
+    "elapsed": "Elapsed",
+    "eta": "ETA",
+    "speed": "Speed",
+    "cancelled": "Cancelled"
+  },
+  "audio": {
+    "play": "Play",
+    "pause": "Pause",
+    "buffering": "Buffering…"
+  },
+  "action": {
+    "extract": "Extract",
+    "copy": "Copy",
+    "extractTitle": "Extract from vault",
+    "extractHint": "The file leaves the vault after it is safely saved on your device.",
+    "extractConfirmOne": "Extract {{item}} from the vault?",
+    "extractConfirmMany": "Extract {{count}} {{type}} from the vault?",
+    "extractPrompt": "This will extract:",
+    "copyConfirmOne": "Copy {{item}} to your device?",
+    "copyConfirmMany": "Copy {{count}} {{type}} to your device?",
+    "copyPrompt": "This will copy:",
+    "deleteConfirmOne": "Delete {{item}} from the vault?",
+    "deleteConfirmMany": "Delete {{count}} {{type}} from the vault?",
+    "continuePrompt": "Continue?",
+    "extractSuccessOne": "Extracted {{item}} successfully.",
+    "extractSuccessMany": "Extracted {{count}} {{type}} successfully.",
+    "copySuccessOne": "Copied {{item}} to your device.",
+    "copySuccessMany": "Copied {{count}} {{type}} to your device.",
+    "deleteSuccessOne": "Deleted {{item}}.",
+    "deleteSuccessMany": "Deleted {{count}} {{type}}.",
+    "reportOk": "Completed successfully.",
+    "reportFailed": "{{failed}} item(s) failed. {{details}}",
+    "countsSummary": "{{success}} succeeded, {{failed}} failed",
+    "verifyFailed": "verification failed",
+    "noSelection": "Select at least one item.",
+    "mixed": "Multiple items"
   }
 }

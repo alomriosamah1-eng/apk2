@@ -25,8 +25,9 @@ class FakeDatabaseService {
     } else if (sql.trim().startsWith('UPDATE items')) {
       this.applyUpdate(sql, params);
     } else if (sql.trim().startsWith('UPDATE vaults')) {
-      this.vaultCounts.item_count = Number(params?.[0]);
-      this.vaultCounts.total_size = Number(params?.[1]);
+      const active = this.rows.filter((r) => r.is_deleted === 0);
+      this.vaultCounts.item_count = active.length;
+      this.vaultCounts.total_size = active.reduce((sum, r) => sum + (r.size ?? 0), 0);
     }
   }
 

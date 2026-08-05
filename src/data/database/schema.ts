@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS activity_log (
     FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS security_questions (
+    id TEXT PRIMARY KEY NOT NULL,
+    vault_id TEXT NOT NULL,
+    question TEXT NOT NULL,
+    answer_hash TEXT NOT NULL,
+    answer_salt TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (vault_id) REFERENCES vaults(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_items_vault_id ON items(vault_id);
 CREATE INDEX IF NOT EXISTS idx_items_parent_id ON items(parent_id);
 CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
@@ -89,4 +101,5 @@ CREATE INDEX IF NOT EXISTS idx_passwords_vault_id ON passwords(vault_id);
 CREATE INDEX IF NOT EXISTS idx_passwords_category ON passwords(category);
 CREATE INDEX IF NOT EXISTS idx_activity_log_created ON activity_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_activity_log_action ON activity_log(action);
+CREATE INDEX IF NOT EXISTS idx_security_questions_vault_id ON security_questions(vault_id);
 `;

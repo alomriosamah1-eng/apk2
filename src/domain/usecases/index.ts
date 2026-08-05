@@ -8,4 +8,10 @@ export { AddItemUseCase } from './item/AddItemUseCase';
 export type { AddItemInput } from './item/AddItemUseCase';
 export { DeleteItemUseCase } from './item/DeleteItemUseCase';
 export { SearchItemsUseCase } from './item/SearchItemsUseCase';
+export { SetupSecurityQuestionsUseCase } from './security/SetupSecurityQuestionsUseCase';
+export type { SecurityQuestionInput } from './security/SetupSecurityQuestionsUseCase';
+export { VerifySecurityAnswersUseCase } from './security/VerifySecurityAnswersUseCase';
+export type { VerifySecurityAnswersResult } from './security/VerifySecurityAnswersUseCase';
+export { ResetPinWithSecurityQuestionsUseCase } from './security/ResetPinWithSecurityQuestionsUseCase';
+export { GetSecurityQuestionsUseCase } from './security/GetSecurityQuestionsUseCase';
 

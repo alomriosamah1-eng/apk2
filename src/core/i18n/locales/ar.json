@@ -46,6 +46,8 @@
     "vaultNamePlaceholder": "خزنتي",
     "pinCode": "رمز PIN",
     "pinPlaceholder": "أدخل رمز PIN من 4-8 أرقام",
+    "currentPin": "رمز PIN الحالي",
+    "newPin": "رمز PIN الجديد",
     "confirmPin": "تأكيد رمز PIN",
     "confirmPinPlaceholder": "أعد إدخال رمز PIN",
     "unlock": "فتح القفل",
@@ -73,7 +75,8 @@
     "faceId": "الوجه",
     "iconA11y": "أيقونة {{name}}",
     "colorA11y": "لون {{hex}}",
-    "biometric": "الفتح بالبصمة"
+    "biometric": "الفتح بالبصمة",
+    "forgotPin": "نسيت رمز PIN؟"
   },
   "vault": {
     "title": "الخزائن",
@@ -86,7 +89,9 @@
     "items": "عنصر",
     "itemsCount": "{{count}} عنصر",
     "deleteConfirm": "هل أنت متأكد من حذف هذه الخزنة؟",
-    "deleteWarning": "سيتم حذف جميع الملفات والبيانات داخل هذه الخزنة بشكل دائم"
+    "deleteWarning": "سيتم حذف جميع الملفات والبيانات داخل هذه الخزنة بشكل دائم",
+    "deleteTitle": "حذف {{name}}",
+    "deleteVault": "حذف الخزنة"
   },
   "welcome": {
     "features": {
@@ -106,6 +111,8 @@
     "addFolder": "إنشاء مجلد",
     "preview": "معاينة",
     "videoPlayer": "مشغل فيديو",
+    "audioDecodeError": "تعذّر فك ترميز هذا الملف الصوتي على الجهاز. قد يكون تالفاً أو يستخدم ترميزاً غير مدعوم.",
+    "audioSeek": "التقديم",
     "fileType": "ملف {{ext}}",
     "noFileSelected": "لم يتم تحديد ملف",
     "folderName": "اسم المجلد",
@@ -139,7 +146,14 @@
     "export": "استخراج إلى المعرض",
     "exportSuccess": "تم استخراج الصورة إلى معرض الصور",
     "deleteConfirm": "حذف هذه الصورة؟",
-    "search": "بحث في الوسائط"
+    "search": "بحث في الوسائط",
+    "noAudioFiles": "لم يتم العثور على ملفات صوتية. اختر ملفاً صوتياً للاستيراد.",
+    "importSummary": "تم استيراد {{imported}}، وتخطي {{skipped}}، وفشل {{failed}}.",
+    "importSkippedCount": "تم تخطي {{count}} ملف مكرر.",
+    "importFailedCount": "فشل استيراد {{count}} ملف.",
+    "hideConfirm": "هل تريد إخفاء الملفات الأصلية من معرض الصور والتخزين؟",
+    "hide": "إخفاء من المعرض",
+    "keep": "إبقاء في المعرض"
   },
   "notes": {
     "title": "الملاحظات",
@@ -210,6 +224,10 @@
     "arabic": "العربية",
     "english": "English",
     "security": "الأمان",
+    "changePin": "تغيير رمز PIN",
+    "changePinDesc": "أدخل رمز PIN الحالي ثم اختر رمزاً جديداً لتأمين الخزنة",
+    "securityQuestions": "أسئلة الأمان",
+    "securityQuestionsDesc": "اجعل استرداد رمز PIN ممكناً عبر أسئلة الأمان",
     "theme": "المظهر",
     "themeLight": "فاتح",
     "themeDark": "داكن",
@@ -258,6 +276,45 @@
     "medium": "متوسطة",
     "high": "عالية",
  "openSettings": "فتح الإعدادات"
+  },
+  "recovery": {
+    "title": "استرداد رمز PIN",
+    "desc": "أجب عن أسئلة الأمان لاسترداد رمز PIN الخاص بالخزنة",
+    "questionsStep": "أسئلة الأمان",
+    "questionsStepDesc": "أجب عن الأسئلة التالية للتحقق من هويتك",
+    "answerLabel": "الإجابة عن السؤال {{count}}",
+    "answerPlaceholder": "اكتب إجابتك",
+    "verify": "تحقق من الإجابات",
+    "answersIncorrect": "إجابة غير صحيحة. حاول مرة أخرى.",
+    "attemptsLeft": "تبقى {{count}} محاولة",
+    "tooManyAttempts": "عدد المحاولات المسموح بها انتهى. افتح الشاشة من جديد.",
+    "noQuestions": "لم يتم إعداد أسئلة الأمان لهذه الخزنة",
+    "resetStep": "تعيين رمز PIN جديد",
+    "resetStepDesc": "إجاباتك صحيحة. اختر رمز PIN جديداً للخزنة.",
+    "reset": "تعيين رمز PIN الجديد",
+    "success": "تم تعيين رمز PIN الجديد بنجاح",
+    "setupTitle": "أسئلة الأمان",
+    "setupDesc": "اختر أسئلة وأجب عنها لاسترداد رمز PIN في حال نسيته",
+    "setupHint": "أجب عن سؤالين على الأقل لتفعيل الاسترداد",
+    "addQuestion": "إضافة سؤال",
+    "removeQuestion": "حذف السؤال",
+    "selectQuestion": "اختر سؤالاً",
+    "questionRequired": "الرجاء اختيار سؤال",
+    "answerRequired": "الرجاء إدخال الإجابة",
+    "answerTooShort": "الإجابة يجب أن تكون حرفين على الأقل",
+    "currencyPinRequired": "أدخل رمز PIN الحالي لتغيير أسئلة الأمان",
+    "currentPinLabel": "رمز PIN الحالي",
+    "save": "حفظ الأسئلة",
+    "saved": "تم حفظ أسئلة الأمان",
+    "presets": {
+      "motherName": "ما هو اسم والدتك؟",
+      "favoriteCity": "ما هي مدينتك المفضلة؟",
+      "petName": "ما اسم حيوانك الأليف؟",
+      "firstSchool": "ما اسم مدرستك الأولى؟",
+      "favoriteFood": "ما هو طعامك المفضل؟",
+      "firstCar": "ما اسم أول سيارة لك؟",
+      "birthCity": "في أي مدينة وُلدت؟"
+    }
   },
   "errors": {
     "general": "حدث خطأ غير متوقع",
@@ -359,5 +416,60 @@
     "monthsAgo_few": "قبل {{count}} أشهر",
     "monthsAgo_many": "قبل {{count}} شهر",
     "monthsAgo_other": "قبل {{count}} شهر"
+  },
+  "itemType": {
+    "image": { "dem": "هذه الصورة", "one": "صورة", "many": "صور" },
+    "video": { "dem": "هذا الفيديو", "one": "فيديو", "many": "فيديوهات" },
+    "audio": { "dem": "هذا الملف الصوتي", "one": "ملف صوتي", "many": "ملفات صوتية" },
+    "document": { "dem": "هذا المستند", "one": "مستند", "many": "مستندات" },
+    "file": { "dem": "هذا الملف", "one": "ملف", "many": "ملفات" }
+  },
+  "progress": {
+    "title": "جارٍ العمل…",
+    "waiting": "في الانتظار",
+    "reading": "قراءة الملفات",
+    "hashing": "التحقق من التكرارات",
+    "encrypting": "التشفير",
+    "writing": "الحفظ",
+    "done": "اكتمل",
+    "percent": "{{percent}}%",
+    "files": "{{done}} / {{total}} ملف",
+    "remaining": "{{count}} متبقية",
+    "elapsed": "الوقت المنقضي",
+    "eta": "الوقت المتبقي",
+    "speed": "السرعة",
+    "cancelled": "تم الإلغاء"
+  },
+  "audio": {
+    "play": "تشغيل",
+    "pause": "إيقاف مؤقت",
+    "buffering": "جارٍ التحميل…"
+  },
+  "action": {
+    "extract": "استخراج",
+    "copy": "نسخ",
+    "extractTitle": "استخراج من الخزنة",
+    "extractHint": "سيتم نقل الملف خارج الخزنة بعد حفّظه بأمان على جهازك.",
+    "extractConfirmOne": "هل تريد استخراج {{item}} من الخزنة؟",
+    "extractConfirmMany": "هل تريد استخراج {{count}} {{type}} من الخزنة؟",
+    "extractPrompt": "سيتم استخراج:",
+    "copyConfirmOne": "هل تريد نسخ {{item}} إلى جهازك؟",
+    "copyConfirmMany": "هل تريد نسخ {{count}} {{type}} إلى جهازك؟",
+    "copyPrompt": "سيتم نسخ:",
+    "deleteConfirmOne": "هل تريد حذف {{item}} من الخزنة؟",
+    "deleteConfirmMany": "هل تريد حذف {{count}} {{type}} من الخزنة؟",
+    "continuePrompt": "هل تريد المتابعة؟",
+    "extractSuccessOne": "تم استخراج {{item}} بنجاح.",
+    "extractSuccessMany": "تم استخراج {{count}} {{type}} بنجاح.",
+    "copySuccessOne": "تم نسخ {{item}} إلى جهازك.",
+    "copySuccessMany": "تم نسخ {{count}} {{type}} إلى جهازك.",
+    "deleteSuccessOne": "تم حذف {{item}}.",
+    "deleteSuccessMany": "تم حذف {{count}} {{type}}.",
+    "reportOk": "اكتملت العملية بنجاح.",
+    "reportFailed": "فشل {{failed}} عنصراً: {{details}}",
+    "countsSummary": "{{success}} نجح، {{failed}} فشل",
+    "verifyFailed": "فشل التحقق من سلامة الملف",
+    "noSelection": "اختر عنصراً واحداً على الأقل.",
+    "mixed": "عناصر متعددة"
   }
 }

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Modal, Pressable, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
@@ -7,11 +7,13 @@ import { spacing, borderRadius, elevations } from '@core/theme';
 import { Typography } from '@ui/components/atoms/Typography';
 import { Icon } from '@ui/components/atoms/Icon';
 import { useVaults } from '@ui/hooks/useVaults';
+import { useSession } from '@ui/providers/SessionProvider';
 import { Vault } from '@domain/entities/Vault';
 
 interface VaultListSheetProps {
   visible: boolean;
   onClose: () => void;
+  showDelete?: boolean;
 }
 
 const VAULT_ICONS: Record<string, keyof typeof import('@expo/vector-icons').MaterialCommunityIcons.glyphMap> = {
@@ -25,15 +27,37 @@ const VAULT_ICONS: Record<string, keyof typeof import('@expo/vector-icons').Mate
   'lock-pattern': 'lock-pattern',
 };
 
-export default function VaultListSheet({ visible, onClose }: VaultListSheetProps) {
+export default function VaultListSheet({ visible, onClose, showDelete = true }: VaultListSheetProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { vaults } = useVaults();
+  const { vaults, deleteVault } = useVaults();
+  const { activeVaultId, lock: lockSession } = useSession();
 
   const handleVaultPress = useCallback((vault: Vault) => {
     onClose();
-    router.push({ pathname: '/(auth)/login', params: { id: vault.id } });
-  }, [onClose]);
+    lockSession();
+    router.replace({ pathname: '/(auth)/login', params: { id: vault.id } });
+  }, [onClose, lockSession]);
+
+  const handleDeleteVault = useCallback((vault: Vault) => {
+    Alert.alert(
+      t('vault.deleteTitle', { name: vault.name }),
+      t('vault.deleteConfirm') + '\n\n' + t('vault.deleteWarning'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            await deleteVault(vault.id);
+            if (activeVaultId === vault.id) {
+              lockSession();
+            }
+          },
+        },
+      ],
+    );
+  }, [activeVaultId, deleteVault, lockSession, t]);
 
   const handleCreateVault = useCallback(() => {
     onClose();
@@ -71,7 +95,17 @@ export default function VaultListSheet({ visible, onClose }: VaultListSheetProps
                         {vault.isLocked ? t('vault.locked') : t('vault.unlocked')} · {t('vault.itemsCount', { count: vault.itemCount })}
                       </Typography>
                     </View>
-                    <Icon name="chevron-left" size={20} color={colors.onSurfaceVariant} />
+                    {showDelete && (
+                      <TouchableOpacity
+                        onPress={() => handleDeleteVault(vault)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('vault.deleteVault')}
+                        hitSlop={10}
+                        style={styles.deleteBtn}
+                      >
+                        <Icon name="trash-can-outline" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -137,6 +171,10 @@ const styles = StyleSheet.create({
   },
   vaultInfo: {
     flex: 1,
+  },
+  deleteBtn: {
+    padding: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
   empty: {
     alignItems: 'center',

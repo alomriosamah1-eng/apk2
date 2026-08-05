@@ -184,8 +184,16 @@ function SettingsScreenContent() {
       }
     }
     lockSession();
-    router.replace('/(auth)/welcome');
+    router.replace('/(auth)/login');
   }, [vaults, lockVault, lockSession]);
+
+  const handleChangePin = useCallback(() => {
+    router.push('/(app)/modals/change-pin');
+  }, []);
+
+  const handleSecurityQuestions = useCallback(() => {
+    router.push('/(app)/modals/security-questions');
+  }, []);
 
   return (
     <ScreenLayout title={t('settings.title')} hasTabs showBack onBack={() => router.back()}>
@@ -205,6 +213,18 @@ function SettingsScreenContent() {
               <Typography variant="bodySmall" color={colors.onSurfaceVariant} style={styles.settingValue}>
                 {AUTO_LOCK_OPTIONS.find((o) => o.value === autoLockValue)?.label ?? t('settings.after5min')}
               </Typography>
+              <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <Divider />
+            <TouchableOpacity style={styles.settingItem} accessibilityRole="button" accessibilityLabel={t('settings.changePin')} onPress={handleChangePin}>
+              <Icon name="shield-lock" size={22} color={colors.onSurface} />
+              <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.changePin')}</Typography>
+              <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <Divider />
+            <TouchableOpacity style={styles.settingItem} accessibilityRole="button" accessibilityLabel={t('settings.securityQuestions')} onPress={handleSecurityQuestions}>
+              <Icon name="help-circle" size={22} color={colors.onSurface} />
+              <Typography variant="bodyLarge" style={styles.settingLabel}>{t('settings.securityQuestions')}</Typography>
               <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           </Card>

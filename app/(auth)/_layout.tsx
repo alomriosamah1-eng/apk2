@@ -16,6 +16,7 @@ export default function AuthLayout() {
       <Stack.Screen name="welcome" />
       <Stack.Screen name="login" />
       <Stack.Screen name="create-vault" />
+      <Stack.Screen name="recover-vault" />
     </Stack>
   );
 }

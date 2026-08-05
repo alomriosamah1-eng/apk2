@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, RefreshControl, TouchableOpacity, TextInput as RNTextInput, ScrollView, Alert, Share } from 'react-native';
+import { View, StyleSheet, RefreshControl, TouchableOpacity, TextInput as RNTextInput, ScrollView, Alert, Share, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
@@ -204,7 +204,11 @@ export default function NotesScreen() {
   if (editingNote) {
     return (
       <ScreenLayout title={notes.find((n) => n.id === editingNote.id) ? t('notes.edit') : t('notes.create')} showBack onBack={() => setEditingNote(null)}>
-        <View style={styles.editorContainer}>
+        <KeyboardAvoidingView
+          style={styles.editorContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        >
           <RNTextInput
             style={[styles.titleInput, { color: colors.onSurface }]}
             value={editTitle}
@@ -213,15 +217,17 @@ export default function NotesScreen() {
             placeholderTextColor={colors.onSurfaceVariant}
             autoFocus
           />
-          <RNTextInput
-            style={[styles.contentInput, { color: colors.onSurface }]}
-            value={editContent}
-            onChangeText={setEditContent}
-            placeholder={t('notes.contentPlaceholder')}
-            placeholderTextColor={colors.onSurfaceVariant}
-            multiline
-            textAlignVertical="top"
-          />
+          <ScrollView contentContainerStyle={styles.contentScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <RNTextInput
+              style={[styles.contentInput, { color: colors.onSurface }]}
+              value={editContent}
+              onChangeText={setEditContent}
+              placeholder={t('notes.contentPlaceholder')}
+              placeholderTextColor={colors.onSurfaceVariant}
+              multiline
+              textAlignVertical="top"
+            />
+          </ScrollView>
           <View style={styles.editorActions}>
             <TouchableOpacity onPress={() => setEditingNote(null)} style={[styles.editorBtn, { borderColor: colors.outline }]}>
               <Typography color={colors.onSurfaceVariant}>{t('common.cancel')}</Typography>
@@ -230,7 +236,7 @@ export default function NotesScreen() {
               <Typography color="#FFFFFF">{t('common.save')}</Typography>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </ScreenLayout>
     );
   }
@@ -385,6 +391,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     paddingVertical: spacing.sm,
+    minHeight: 200,
+  },
+  contentScroll: {
+    flexGrow: 1,
   },
   editorActions: {
     flexDirection: 'row',

@@ -33,6 +33,56 @@ export class ItemRepositoryImpl implements IItemRepository {
     }
   }
 
+  /** Deletes multiple items in one transaction and updates vault counts once. */
+  async deleteMany(ids: string[], vaultId: string): Promise<Result<void>> {
+    if (ids.length === 0) return success(undefined);
+    try {
+      await this.db.transaction(async () => {
+        const placeholders = ids.map(() => '?').join(',');
+        await this.db.executeSql(`DELETE FROM items WHERE id IN (${placeholders})`, ids);
+        const vaultResult = await this.db.queryOne<{ count: number }>('SELECT COUNT(*) as count FROM vaults WHERE id = ?', [vaultId]);
+        if (vaultResult && vaultResult.count > 0) {
+          await this.updateVaultCounts(vaultId);
+        }
+      });
+      return success(undefined);
+    } catch (error) {
+      return failure(new DatabaseError('Failed to delete many items', (error as Error).message));
+    }
+  }
+
+  /**
+   * Inserts many items within a single database transaction and recomputes the
+   * vault counts exactly once afterwards. Bulk import should use this instead of
+   * calling {@link create} per file (which triggers a count query per insert).
+   */
+  async createMany(items: Item[]): Promise<Result<void>> {
+    if (items.length === 0) return success(undefined);
+    const vaultId = items[0]?.vaultId;
+    if (!vaultId) return failure(new DatabaseError('createMany requires a vaultId', 'Missing vaultId'));
+    try {
+      await this.db.transaction(async () => {
+        for (const item of items) {
+          const dto = this.mapper.toDTO(item);
+          await this.db.executeSql(
+            `INSERT INTO items (id, vault_id, parent_id, name, type, mime_type, size, 
+             encrypted_path, encrypted_data, thumbnail_path, metadata_json, is_favorite, 
+             is_deleted, created_at, updated_at, deleted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [dto.id, dto.vault_id, dto.parent_id, dto.name, dto.type, dto.mime_type,
+             dto.size, dto.encrypted_path, dto.encrypted_data, dto.thumbnail_path,
+             dto.metadata_json, dto.is_favorite, dto.is_deleted, dto.created_at,
+             dto.updated_at, dto.deleted_at],
+          );
+        }
+      });
+      await this.updateVaultCounts(vaultId);
+      return success(undefined);
+    } catch (error) {
+      return failure(new DatabaseError('Failed to create items in bulk', (error as Error).message));
+    }
+  }
+
   /** Finds an item by its ID, or null if not found. */
   async findById(id: string): Promise<Result<Item | null>> {
     try {
@@ -224,9 +274,31 @@ export class ItemRepositoryImpl implements IItemRepository {
     }
   }
 
-  /** Returns the most recently created items across all vaults. */
-  async getRecentItems(limit: number): Promise<Result<Item[]>> {
+  /** Returns all content hashes stored in metadata for a vault (import dedup). */
+  async findContentHashes(vaultId: string): Promise<Result<string[]>> {
     try {
+      const rows = await this.db.query<{ metadata_json: string | null }>(
+        `SELECT metadata_json FROM items WHERE vault_id = ? AND is_deleted = 0`,
+        [vaultId],
+      );
+      const hashes: string[] = [];
+      for (const row of rows) {
+        if (!row.metadata_json) continue;
+        try {
+          const meta = JSON.parse(row.metadata_json) as { content_hash?: string };
+          if (typeof meta.content_hash === 'string') hashes.push(meta.content_hash);
+        } catch {
+          // ignore malformed metadata
+        }
+      }
+      return success(hashes);
+    } catch (error) {
+      return failure(new DatabaseError('Failed to read content hashes', (error as Error).message));
+    }
+  }
+
+  /** Returns the most recently created items across all vaults. */
+  async getRecentItems(limit: number): Promise<Result<Item[]>> {    try {
       const rows = await this.db.query<ItemDTO>(
         `SELECT ${this.ITEM_COLUMNS} FROM items WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ?`,
         [limit],
@@ -237,15 +309,18 @@ export class ItemRepositoryImpl implements IItemRepository {
     }
   }
 
+  /**
+   * Refreshes the cached vault counts (item_count, total_size) with a single
+   * SQL statement instead of three round-trips. Called once per mutation batch.
+   */
   private async updateVaultCounts(vaultId: string): Promise<void> {
-    const countResult = await this.countByVaultId(vaultId);
-    const sizeResult = await this.getTotalSize(vaultId);
-    if (countResult.success && sizeResult.success) {
-      await this.db.executeSql(
-        'UPDATE vaults SET item_count = ?, total_size = ? WHERE id = ?',
-        [countResult.data, sizeResult.data, vaultId],
-      );
-    }
+    await this.db.executeSql(
+      `UPDATE vaults SET
+         item_count = (SELECT COUNT(*) FROM items WHERE vault_id = ? AND is_deleted = 0),
+         total_size = (SELECT COALESCE(SUM(size), 0) FROM items WHERE vault_id = ? AND is_deleted = 0)
+       WHERE id = ?`,
+      [vaultId, vaultId, vaultId],
+    );
   }
 
   private mapSortBy(sortBy: string): string {

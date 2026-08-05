@@ -17,8 +17,13 @@
       }
     },
     "production": {
+      "autoIncrement": true,
       "android": {
-        "buildType": "apk"
+        // AAB: Google Play serves per-ABI split APKs to each device, so the
+        // installed size stays well under 30MB while remaining compatible with
+        // every Android version/ABI (minSdk 24). Use "preview" for a universal
+        // APK you can sideload directly.
+        "buildType": "app-bundle"
       }
     }
   },

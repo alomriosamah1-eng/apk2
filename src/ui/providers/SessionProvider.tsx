@@ -21,6 +21,7 @@ interface SessionContextValue extends SessionState {
 
 const AUTO_LOCK_KEY = 'auto_lock_timeout';
 const SESSION_KEY = 'khaznati_active_session';
+const HAS_LAUNCHED_KEY = 'khaznati_has_launched';
 const DEFAULT_AUTO_LOCK = 300000;
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -41,9 +42,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     storageRef.current = DIContainer.resolve<SecureStorageSource>('SecureStorageSource');
     (async () => {
       try {
-        const [storedTimeout, storedSession] = await Promise.all([
+        const [storedTimeout, storedSession, hasLaunched] = await Promise.all([
           storageRef.current!.get(AUTO_LOCK_KEY),
           storageRef.current!.get(SESSION_KEY),
+          storageRef.current!.get(HAS_LAUNCHED_KEY),
         ]);
         setState((prev) => ({
           ...prev,
@@ -60,6 +62,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }));
             router.replace({ pathname: '/(app)/(tabs)/vault', params: { vaultId: parsed.vaultId } });
           }
+        } else if (hasLaunched) {
+          // Returning user: skip the first-run welcome screen.
+          router.replace('/(auth)/login');
+        } else {
+          // First launch: show welcome, remember it for next time.
+          await storageRef.current!.set(HAS_LAUNCHED_KEY, 'true');
         }
       } catch (error) {
         // Ignore malformed/corrupt session; fall through to a fresh login.

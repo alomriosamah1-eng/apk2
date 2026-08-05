@@ -26,4 +26,20 @@ module.exports = {
     'no-duplicate-imports': 'error',
   },
   ignorePatterns: ['node_modules/', '.expo/', 'dist/', 'android/', 'server/', '*.config.js'],
+  overrides: [
+    {
+      // Test files deliberately use `require()` for module mocking and manual
+      // dependency injection, and commonly exceed UI complexity/length limits.
+      files: ['__tests__/**/*.{ts,tsx}'],
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off',
+        '@typescript-eslint/explicit-function-return-type': 'off',
+        '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^mock' }],
+        'max-lines': 'off',
+        'max-depth': 'off',
+        'max-params': 'off',
+        'complexity': 'off',
+      },
+    },
+  ],
 };

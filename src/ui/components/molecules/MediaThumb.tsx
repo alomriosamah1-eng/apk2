@@ -4,24 +4,36 @@ import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing, borderRadius } from '@core/theme';
 import { Icon } from '@ui/components/atoms/Icon';
 import { Typography } from '@ui/components/atoms/Typography';
+import { ItemType } from '@core/constants';
 
 export interface MediaItem {
   id: string;
+  dbId?: string;
   name: string;
+  type: ItemType;
+  mimeType: string | null;
   encryptedPath: string;
   decryptedUri: string | null;
+  size?: number;
+  durationMs?: number;
 }
 
 const NUM_COLUMNS = 3;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const ITEM_SIZE = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+export const MEDIA_THUMB_SIZE = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 
 interface MediaThumbProps {
   item: MediaItem;
   selected: boolean;
-  showLabel: boolean;
+  showLabel?: boolean;
   onPress: () => void;
   onLongPress: () => void;
+}
+
+function typeIcon(type: ItemType): 'image' | 'video' | 'music' {
+  if (type === ItemType.VIDEO) return 'video';
+  if (type === ItemType.AUDIO) return 'music';
+  return 'image';
 }
 
 export function MediaThumb({ item, selected, showLabel, onPress, onLongPress }: MediaThumbProps): React.JSX.Element {
@@ -34,7 +46,7 @@ export function MediaThumb({ item, selected, showLabel, onPress, onLongPress }: 
             <Icon name="check-circle" size={24} color={colors.primary} />
           </View>
         )}
-        <Icon name="image" size={28} color={colors.onSurfaceVariant} />
+        <Icon name={typeIcon(item.type)} size={28} color={colors.onSurfaceVariant} />
         {showLabel && (
           <Typography variant="caption" color={colors.onSurfaceVariant} style={styles.fileName} numberOfLines={1}>
             {item.name}
@@ -47,8 +59,8 @@ export function MediaThumb({ item, selected, showLabel, onPress, onLongPress }: 
 
 const styles = StyleSheet.create({
   mediaItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
+    width: MEDIA_THUMB_SIZE,
+    height: MEDIA_THUMB_SIZE,
   },
   thumbnail: {
     width: '100%',

@@ -8,3 +8,5 @@ export type { INoteRepository } from './INoteRepository';
 export type { IPasswordRepository } from './IPasswordRepository';
 /** Repository for activity log persistence operations. */
 export type { IActivityLogRepository, ActivityLogQueryOptions } from './IActivityLogRepository';
+/** Repository for security-question persistence operations. */
+export type { ISecurityQuestionRepository } from './ISecurityQuestionRepository';

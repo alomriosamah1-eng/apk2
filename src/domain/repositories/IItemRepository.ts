@@ -6,6 +6,11 @@ import { Result } from '@core/errors';
 export interface IItemRepository {
   /** Creates a new item. */
   create(item: Item): Promise<Result<Item>>;
+  /**
+   * Creates many items within a single transaction and recomputes the parent
+   * vault counts exactly once (avoids O(n^2) count queries on batch import).
+   */
+  createMany(items: Item[]): Promise<Result<void>>;
   /** Finds an item by its ID. */
   findById(id: string): Promise<Result<Item | null>>;
   /** Finds all items within a vault, with optional query options. */
@@ -30,6 +35,8 @@ export interface IItemRepository {
   countByVaultId(vaultId: string): Promise<Result<number>>;
   /** Returns the total storage size of all items in a vault. */
   getTotalSize(vaultId: string): Promise<Result<number>>;
+  /** Returns all stored content hashes (metadata.content_hash) for a vault. Used for import dedup. */
+  findContentHashes(vaultId: string): Promise<Result<string[]>>;
   /** Retrieves the most recently accessed items. */
   getRecentItems(limit: number): Promise<Result<Item[]>>;
 }

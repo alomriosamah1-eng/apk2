@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import React, { useCallback } from 'react';
+import { FlatList, StyleSheet, RefreshControl, ListRenderItem } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@ui/providers/ThemeProvider';
 import { spacing } from '@core/theme';
@@ -18,41 +18,51 @@ interface FilesListProps {
   onImport: () => void;
 }
 
+/**
+ * Virtualized file list. Only the visible window is rendered so a vault with
+ * tens of thousands of files stays responsive and memory-bounded.
+ */
 export function FilesList({ files, search, refreshing, selectedIds, onRefresh, onToggle, onPress, onLongPress, onImport }: FilesListProps): React.JSX.Element {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const filteredFiles = search
     ? files.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
     : files;
-  const isEmpty = filteredFiles.length === 0;
+  const renderItem: ListRenderItem<FileItem> = useCallback(({ item }) => (
+    <FileRow
+      item={item}
+      selected={selectedIds.has(item.id)}
+      onToggle={() => onToggle(item.id)}
+      onPress={() => onPress(item)}
+      onLongPress={() => onLongPress(item)}
+    />
+  ), [selectedIds, onToggle, onPress, onLongPress]);
+
+  const ListEmptyComponent = useCallback(() => (
+    <EmptyState
+      icon="folder-open-outline"
+      title={search ? t('common.noResults') : t('files.empty')}
+      description={search ? t('common.noResults') : t('files.emptyDesc')}
+      actionLabel={search ? undefined : t('files.addFile')}
+      onAction={search ? undefined : onImport}
+    />
+  ), [onImport, search, t]);
 
   return (
-    <ScrollView
+    <FlatList
       style={styles.listContainer}
+      data={filteredFiles}
+      keyExtractor={useCallback((item: FileItem) => item.id, [])}
+      renderItem={renderItem}
+      ListEmptyComponent={ListEmptyComponent}
       contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      initialNumToRender={20}
+      maxToRenderPerBatch={20}
+      windowSize={9}
+      removeClippedSubviews
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-    >
-      {isEmpty ? (
-        <EmptyState
-          icon="folder-open-outline"
-          title={search ? t('common.noResults') : t('files.empty')}
-          description={search ? t('common.noResults') : t('files.emptyDesc')}
-          actionLabel={search ? undefined : t('files.addFile')}
-          onAction={search ? undefined : onImport}
-        />
-      ) : (
-        filteredFiles.map((item) => (
-          <FileRow
-            key={item.id}
-            item={item}
-            selected={selectedIds.has(item.id)}
-            onToggle={() => onToggle(item.id)}
-            onPress={() => onPress(item)}
-            onLongPress={() => onLongPress(item)}
-          />
-        ))
-      )}
-    </ScrollView>
+    />
   );
 }
 

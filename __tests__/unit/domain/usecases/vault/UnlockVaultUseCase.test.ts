@@ -7,6 +7,9 @@ import { generateSalt, hashPin } from '@core/utils';
 
 jest.mock('expo-crypto');
 
+// Real PBKDF2 hashing (30k–100k iterations) is intentionally slow; allow time.
+jest.setTimeout(30000);
+
 const now = Date.now();
 
 function makeVault(overrides: Partial<Vault> = {}): Vault {

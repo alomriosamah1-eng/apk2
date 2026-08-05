@@ -17,6 +17,8 @@ export default function ModalsLayout() {
       <Stack.Screen name="file-preview" />
       <Stack.Screen name="activity-log" />
       <Stack.Screen name="about" />
+      <Stack.Screen name="change-pin" />
+      <Stack.Screen name="security-questions" />
     </Stack>
   );
 }
