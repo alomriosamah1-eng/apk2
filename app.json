@@ -72,7 +72,6 @@
         }
       ],
       "expo-audio",
-      "./plugins/withAbiSplits",
       [
         "expo-build-properties",
         {
